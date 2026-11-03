@@ -1,0 +1,29 @@
+<section class="window games-window" [class.inactive]="!focused()" aria-label="Juegos de NSM" (pointerdown)="focusWindow.emit()" (focusin)="focusWindow.emit()">
+  <div class="titlebar"><span class="tiny-logo" aria-hidden="true"></span><span>{{ games.activeRoom()?.game?.name ?? 'Juegos' }} · Jugar con amigos</span><div class="window-controls"><button type="button" aria-label="Cerrar juegos" (click)="leave(true)">×</button></div></div>
+  <div class="window-menubar"><button type="button" class="menu-button" (click)="showFriends.emit()">Amigos y chat</button><span>Hasta {{ games.activeRoom()?.game?.maxPlayers ?? 4 }} jugadores</span>@if (games.activeRoom()) { <button type="button" class="menu-button danger-action" (click)="leave()">{{ games.activeRoom()?.host?.id === session.user()?.id ? 'Terminar partida' : 'Salir de la partida' }}</button> }</div>
+  @if (games.error()) { <p class="error game-error" role="alert">{{ games.error() }}</p> }
+  @if (games.activeRoom(); as room) {
+    <div class="room-heading"><div><strong>Sala de {{ room.host.displayName }}</strong><small>{{ room.game.name }} · {{ room.players.length }}/{{ room.game.maxPlayers }} jugadores · {{ room.ready ? 'Transmitiendo' : 'Esperando inicio' }}</small></div></div>
+    @if (room.host.id === session.user()?.id) {
+      <details class="room-invites" [open]="!room.ready"><summary>Invitar amigos a esta sala</summary><div class="invite-list">
+      @for (friend of inviteable(); track friend.id) { <div [attr.data-friend-id]="friend.id"><span class="presence-dot" [class.online]="friend.online"></span><span>{{ friend.displayName }} <small>{{ friend.online ? 'Conectado' : 'Desconectado' }}</small></span><button type="button" [disabled]="games.busy() || pending(friend.id) || full()" (click)="games.invite(friend.id)">{{ pending(friend.id) ? 'Invitación enviada' : 'Invitar a la sala' }}</button></div> } @empty { <p>Agregá amigos en NSM para invitarlos. También podés jugar solo.</p> }
+      </div></details>
+    }
+    <div class="game-roster" aria-label="Jugadores de la partida">@for (player of room.players; track player.user.id) { <span>J{{ player.seat + 1 }} · {{ player.user.displayName }}{{ player.seat === 0 ? ' (anfitrión)' : '' }}</span> }<span class="muted">{{ room.ready ? 'Juego compartido' : 'Preparando juego' }}</span></div>
+    @if (frame(); as url) { <iframe class="game-frame" [title]="'Partida de ' + room.game.name" [src]="url" allow="autoplay; fullscreen; gamepad; display-capture"></iframe> }
+  } @else {
+    <div class="games-catalog">
+      <div class="games-intro"><span class="games-mark" aria-hidden="true">✚</span><div><h2>Nos vemos en la próxima partida.</h2><p>Elegí un juego, creá tu sala y sumá a tus amigos.</p></div></div>
+      <div class="game-cards">@for (game of games.state().catalog; track game.id) { @if(game.enabled) {
+        <article class="game-card"><div class="game-cover" [class.racing]="game.id === 'crash-team-racing'" aria-hidden="true">{{ game.id === 'crash-team-racing' ? 'CTR' : 'BASH' }}</div><div class="game-card-body"><h3>{{game.name}}</h3><p>Hasta {{game.maxPlayers}} jugadores · Teclado o mando</p><small>{{game.available ? 'Disponible' : 'Archivos pendientes de configurar'}}</small><button type="button" [disabled]="!games.state().canHost || !game.available || games.busy()" (click)="games.create(game.id)">Crear sala de {{game.name}}</button></div></article>
+      } }</div>
+      @if(!games.state().canHost) { <p class="inset-note">Por ahora el anfitrión crea la sala. Sus invitaciones aparecen acá.</p> }
+      <h3 class="games-section-title">Invitaciones y salas</h3>
+      @if(!games.state().incoming.length && !games.state().rooms.length) { <p class="games-empty">Todo tranquilo por acá. Las invitaciones de tus amigos van a aparecer en este panel.</p> }
+      @for (invitation of games.state().incoming; track invitation.id) { <article class="game-invitation"><strong>{{ invitation.from.displayName }} te invitó a {{ invitation.game.name }}</strong><p>La invitación reserva una plaza durante cinco minutos.</p><div class="button-row"><button type="button" [disabled]="games.busy()" (click)="games.respond(invitation.id, true)">Aceptar partida de {{ invitation.from.displayName }}</button><button type="button" [disabled]="games.busy()" (click)="games.respond(invitation.id, false)">Rechazar</button></div></article> }
+      @for (room of games.state().rooms; track room.id) { <button class="primary" type="button" (click)="games.open(room)">Volver a la partida de {{ room.host.displayName }}</button> }
+      <p class="muted">Jugá desde una PC con teclado o mando. El anfitrión debe mantener la pestaña abierta.</p>
+    </div>
+  }
+  <div class="game-pending">@for (invitation of games.state().outgoing; track invitation.id) { <small>Esperando a {{ invitation.to.displayName }}…</small> }</div>
+</section>

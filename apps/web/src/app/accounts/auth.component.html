@@ -1,0 +1,18 @@
+<section class="window auth-window" aria-label="Conexión a NSM">
+ <div class="titlebar"><span class="tiny-logo" aria-hidden="true"></span><span>NSM · Bienvenido</span><span class="title-decoration" aria-hidden="true">_ ▢ ×</span></div>
+ <div class="auth-content"><div class="auth-brand"><span class="messenger-mark" aria-hidden="true"><i></i><b></b></span><div><h1>NSM<span>messenger</span></h1><p>Nostalgic Simple Messenger</p></div></div>
+ <nav class="tabs" aria-label="Acceso a la cuenta"><button type="button" [class.selected]="mode()==='login'" (click)="select('login')">Conectar</button><button type="button" [class.selected]="mode()==='register'" (click)="select('register')">Crear cuenta</button></nav>
+ <div class="tab-content"><h2>{{mode()==='login'?'Qué bueno verte de nuevo.':'Tus amigos te esperan.'}}</h2><p class="muted">{{mode()==='login'?'Conectá y empezá a conversar.':'Elegí tu usuario y una contraseña. Sin correo ni códigos.'}}</p>
+ <form [attr.action]="'/api/auth/'+mode()" method="post" (ngSubmit)="submit()" novalidate>
+ <label for="username">Usuario</label><input id="username" name="username" [(ngModel)]="username" (blur)="validate('username')" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="24" aria-describedby="username-help" [attr.aria-invalid]="!!errors().username" placeholder="Tu nombre de usuario">
+ <small id="username-help" [class.field-error]="errors().username">{{errors().username || (mode()==='register'?'Entre 3 y 24 letras, números o guion bajo.':'')}}</small>
+ @if(mode()==='register') {<label for="displayName">Nombre visible</label><input id="displayName" name="displayName" [(ngModel)]="displayName" (blur)="validate('displayName')" autocomplete="nickname" required maxlength="40" [attr.aria-invalid]="!!errors().displayName" aria-describedby="name-error" placeholder="Así te ven tus amigos"><small id="name-error" class="field-error">{{errors().displayName}}</small>}
+ <label for="password">Contraseña</label><input id="password" name="password" [(ngModel)]="password" (blur)="validate('password')" [type]="showPassword()?'text':'password'" [autocomplete]="mode()==='login'?'current-password':'new-password'" required maxlength="128" aria-describedby="password-help" [attr.aria-invalid]="!!errors().password" [placeholder]="mode()==='login'?'Tu contraseña':'Al menos 8 caracteres'">
+ <small id="password-help" [class.field-error]="errors().password">{{errors().password || (mode()==='register'?'Al menos 8 caracteres. Podés usar espacios.':'')}}</small>
+ @if(mode()==='register') {<label for="passwordConfirm">Repetí la contraseña</label><input id="passwordConfirm" name="passwordConfirm" [(ngModel)]="passwordConfirm" (blur)="validate('passwordConfirm')" [type]="showPassword()?'text':'password'" autocomplete="new-password" required maxlength="128" aria-describedby="confirm-error" [attr.aria-invalid]="!!errors().passwordConfirm" placeholder="La misma contraseña de arriba"><small id="confirm-error" class="field-error">{{errors().passwordConfirm}}</small>}
+ <label class="checkbox-label password-visibility"><input type="checkbox" [checked]="showPassword()" (change)="showPassword.set(!showPassword())"> Mostrar contraseña{{mode()==='register'?'s':''}}</label>
+ @if(error() || session.notice()) {<p class="error" role="alert">{{error() || session.notice()}}</p>}
+ <button class="primary full-width connect-button" type="submit" [disabled]="busy()">{{busy()?'Conectando…':mode()==='login'?'Conectar →':'Crear mi cuenta →'}}</button>
+ </form></div><div class="auth-footer"><span class="status-dot" aria-hidden="true"></span> Sin feed. Sin ruido. Solo tus amigos.</div></div>
+ <div class="statusbar"><span>NSM</span><span>Registro abierto</span></div>
+</section>

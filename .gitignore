@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.angular/
+.env
+.env.*
+!.env.example
+.local/
+test-results/
+playwright-report/
+*.log
+
+# Private deployment settings and game assets
+*.env
+*.chd
+*.bin
+*.sbi
+*.zip
+*.7z
+*.mp4
+*.sqlite
+*.dump

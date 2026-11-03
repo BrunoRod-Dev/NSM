@@ -1,0 +1,29 @@
+<main #workspace class="desktop" [class.logged-in]="session.user() && !session.recoveryCode()" [style.--app-height]="viewportHeight() + 'px'">
+  <div class="desktop-topline"><span>NSM — Nostalgic Simple Messenger</span><span>EDICIÓN AMIGOS / REGISTRO ABIERTO</span></div>
+  @if (!session.ready()) { <div class="boot-message" role="status"><span class="messenger-mark" aria-hidden="true"><i></i><b></b></span><p>Abriendo tu ventana…</p></div> }
+  @else if (!session.user() || session.recoveryCode()) {
+    <div class="welcome-layout">
+      <section class="welcome-copy"><span class="eyebrow">VOLVER A CONECTAR.</span><h2>Internet era <br>más lindo <br>con amigos<span>_</span></h2><p>Una ventana. Un «¿estás?».<br>Y una conversación que se queda.</p><div class="welcome-rule"></div><div class="welcome-details"><span>01 / Amigos de verdad</span><span>02 / Conversaciones privadas</span><span>03 / Cero feed infinito</span></div><small>Un mensajero simple. Como antes, desde ahora.</small></section>
+      <nsm-auth />
+    </div>
+  } @else {
+    <div class="desktop-icons" aria-label="Escritorio"><button type="button" (click)="showFriends()"><span class="desktop-logo" aria-hidden="true"><span class="messenger-mark"><i></i><b></b></span></span><span>Mi NSM</span></button><button type="button" (click)="games.open()"><span class="pixel-game" aria-hidden="true">✛</span><span>Juegos</span></button></div>
+    <nsm-friends [style.z-index]="friendsZ()" [class.friends-foreground]="friendsForeground()" [class.compact-inactive]="!friendsForeground()" (pointerdown)="showFriends(false)" (focusin)="showFriends(false)" (openPeer)="openPeer($event)" />
+    <div class="desktop-watermark" aria-hidden="true"><strong>nsm</strong><span>menos ruido.<br>más amigos.</span></div>
+    @if (games.visible()) { <nsm-games [focused]="gamesForeground()" [style.z-index]="gamesZ()" (focusWindow)="focusGames()" (showFriends)="showFriends()" /> }
+    @if (games.state().incoming.length && !gamesForeground()) { <aside class="game-notifications" aria-label="Invitaciones a jugar"><span>{{ games.state().incoming[0].from.displayName }} te invitó a {{ games.state().incoming[0].game.name }}</span><button type="button" (click)="games.open()">Ver invitaciones</button></aside> }
+    @for (window of windows(); track window.id) {
+      @if (conversation(window.id); as chat) { <nsm-chat [attr.data-window-id]="window.id" [conversation]="chat" [active]="active() === window.id" [maximized]="window.maximized" [class.compact-inactive]="friendsForeground() || active() !== window.id" [style.display]="window.minimized ? 'none' : null" [style.left.px]="window.x" [style.top.px]="window.y" [style.width.px]="window.width" [style.height.px]="window.height" [style.z-index]="window.z" (focusWindow)="focus(window.id)" (minimize)="minimize(window.id)" (closeWindow)="close(window.id)" (showFriends)="showFriends()" (toggleMaximize)="toggleMaximize(window.id)" (moved)="move(window.id, $event)" /> }
+    }
+  }
+  @if (startOpen()) { <aside class="start-menu window"><div class="start-rail">NSM <span>2000</span></div><div><strong>Nostalgic Simple Messenger</strong><p>Amigos, ventanas y conversaciones.<br>Hecho para volver a conectar.</p><p>Primera edición · Prueba cerrada</p><button type="button" (click)="startOpen.set(false)">Volver al escritorio</button></div></aside> }
+</main>
+<footer class="taskbar" [style.--app-height]="viewportHeight() + 'px'">
+  <button class="start-button" type="button" [attr.aria-expanded]="startOpen()" (click)="startOpen.set(!startOpen())"><span class="tiny-logo" aria-hidden="true"></span>Inicio</button><div class="task-divider"></div>
+  <div class="task-buttons">
+    <button type="button" class="main-task" [class.pressed]="friendsForeground() && session.user()" (click)="showFriends()"><span class="tiny-logo" aria-hidden="true"></span>{{ compact() ? 'Amigos' : 'NSM Messenger' }}</button>
+    @if (games.visible()) { <button type="button" class="game-task" [class.pressed]="gamesForeground()" (click)="games.open()">{{ games.activeRoom()?.game?.name ?? 'Juegos' }}</button> }
+    @for (window of taskWindows(); track window.id) { <button type="button" class="chat-task" [title]="conversation(window.id)?.peer?.displayName ?? ''" [class.pressed]="active() === window.id && !window.minimized" (click)="focus(window.id, true)">{{ conversation(window.id)?.peer?.displayName }} @if (store.unread()[window.id]) { <b>({{ store.unread()[window.id] }})</b> }</button> }
+  </div>
+  <div class="system-tray"><span class="status-dot" [class.offline]="!session.user() || store.connection() !== 'online'" aria-hidden="true"></span><span class="tray-label">{{ session.user() ? 'NSM' : 'Sin conectar' }}</span><time>{{ now() | date:'HH:mm' }}</time></div>
+</footer>

@@ -1,0 +1,48 @@
+<section class="window friends-window" aria-label="Amigos de NSM">
+  <div class="titlebar"><span class="tiny-logo" aria-hidden="true"></span><span>NSM Messenger</span><span class="title-decoration" aria-hidden="true">▢</span></div>
+  <div class="window-menubar"><span>Mi cuenta</span><button class="menu-button" type="button" (click)="editName()">Cambiar nombre</button><button class="menu-button" type="button" (click)="logout()">Salir</button></div>
+  <header class="identity-panel">
+    <span class="avatar self" aria-hidden="true">{{ session.user()?.displayName?.slice(0, 1)?.toUpperCase() }}</span>
+    <div><strong>{{ session.user()?.displayName }}</strong><small>{{ '@' + session.user()?.username }}</small><span class="connection-label"><i class="status-dot" [class.offline]="store.connection() !== 'online'"></i>{{ connectionLabel() }}</span></div>
+  </header>
+  @if (editing()) {
+    <form class="rename-form" (ngSubmit)="saveName()"><label for="rename">Nombre visible</label><input id="rename" name="name" [(ngModel)]="name" maxlength="40" required><div class="button-row"><button type="submit">Guardar</button><button type="button" (click)="editing.set(false)">Cancelar</button></div></form>
+  }
+  <nav class="tabs friend-tabs" aria-label="Contactos">
+    <button type="button" [class.selected]="tab() === 'friends'" [attr.aria-pressed]="tab() === 'friends'" (click)="tab.set('friends')">Amigos</button>
+    <button type="button" [class.selected]="tab() === 'requests'" [attr.aria-pressed]="tab() === 'requests'" (click)="tab.set('requests')">Solicitudes @if (store.social().incoming.length) { <b class="badge">{{ store.social().incoming.length }}</b> }</button>
+    <button type="button" [class.selected]="tab() === 'history'" [attr.aria-pressed]="tab() === 'history'" (click)="tab.set('history')">Historial</button>
+  </nav>
+  <div class="contacts-body inset">
+    @if (tab() === 'friends') {
+      <h2 class="group-title">▾ Conectados ({{ online().length }})</h2>
+      @for (friend of online(); track friend.id) {
+        <div class="contact-row"><button class="contact-main" type="button" [attr.aria-label]="friend.displayName + ' @' + friend.username" (click)="openPeer.emit(friend.id)"><span class="contact-person" aria-hidden="true"></span><span><strong>{{ friend.displayName }}</strong><small>{{ '@' + friend.username }}</small></span></button><details class="contact-options"><summary [attr.aria-label]="'Opciones de ' + friend.displayName" [title]="'Opciones de ' + friend.displayName">Más</summary><div class="contact-options-menu"><button type="button" [attr.aria-label]="'Eliminar amigo ' + friend.username" (click)="change(friend, 'remove')">Eliminar amigo</button><button class="danger-action" type="button" [attr.aria-label]="'Bloquear a ' + friend.username" (click)="change(friend, 'block')">Bloquear</button></div></details></div>
+      }
+      <h2 class="group-title">▾ Desconectados ({{ offline().length }})</h2>
+      @for (friend of offline(); track friend.id) {
+        <div class="contact-row offline-contact"><button class="contact-main" type="button" [attr.aria-label]="friend.displayName + ' @' + friend.username" (click)="openPeer.emit(friend.id)"><span class="contact-person" aria-hidden="true"></span><span><strong>{{ friend.displayName }}</strong><small>{{ '@' + friend.username }}</small></span></button><details class="contact-options"><summary [attr.aria-label]="'Opciones de ' + friend.displayName" [title]="'Opciones de ' + friend.displayName">Más</summary><div class="contact-options-menu"><button type="button" [attr.aria-label]="'Eliminar amigo ' + friend.username" (click)="change(friend, 'remove')">Eliminar amigo</button><button class="danger-action" type="button" [attr.aria-label]="'Bloquear a ' + friend.username" (click)="change(friend, 'block')">Bloquear</button></div></details></div>
+      }
+      @if (!store.social().friends.length) { <div class="contacts-empty"><span class="outline-people" aria-hidden="true">♧</span><strong>Una lista chica.<br>Buenas conversaciones.</strong><p>Agregá a tu primer amigo<br>con su nombre de usuario.</p></div> }
+    }
+    @if (tab() === 'requests') {
+      <h2 class="group-title">Recibidas ({{ store.social().incoming.length }})</h2>
+      @for (request of store.social().incoming; track request.id) {
+        <div class="request-row"><strong>{{ request.from.displayName }}</strong><small>{{ '@' + request.from.username }}</small><div class="button-row"><button type="button" (click)="respond(request.id, true)" [attr.aria-label]="'Aceptar a ' + request.from.username">Aceptar</button><button type="button" (click)="respond(request.id, false)">Rechazar</button><button type="button" (click)="change(request.from, 'block')" [attr.aria-label]="'Bloquear a ' + request.from.username">Bloquear</button></div></div>
+      } @empty { <p class="list-note">No tenés solicitudes pendientes.</p> }
+      <h2 class="group-title">Enviadas ({{ store.social().outgoing.length }})</h2>
+      @for (request of store.social().outgoing; track request.id) { <div class="request-row"><strong>{{ request.to.displayName }}</strong><small>{{ '@' + request.to.username }} · Esperando respuesta</small></div> }
+    }
+    @if (tab() === 'history') {
+      <h2 class="group-title">Tus conversaciones</h2>
+      @for (conversation of store.conversations(); track conversation.id) { <button type="button" class="history-row" (click)="openPeer.emit(conversation.peer.id)"><span class="tiny-logo" aria-hidden="true"></span><span><strong>{{ conversation.peer.displayName }}</strong><small>{{ conversation.canSend ? 'Abrir conversación' : 'Historial · contacto no disponible' }}</small></span>@if (store.unread()[conversation.id]) { <b class="badge">{{ store.unread()[conversation.id] }}</b> }</button> }
+      @empty { <p class="list-note">Tus conversaciones aparecerán acá.</p> }
+    }
+  </div>
+  <form class="add-friend" (ngSubmit)="add()"><label for="add-username">Agregar un amigo</label><div class="input-button"><input id="add-username" name="username" [(ngModel)]="username" required minlength="3" maxlength="24" placeholder="Usuario exacto" autocapitalize="none" spellcheck="false"><button type="submit" [disabled]="busy()">Agregar</button></div></form>
+  @if (notice()) { <p class="success-note" role="status">{{ notice() }}</p> }
+  @if (store.error()) { <div class="inline-error"><p class="error" role="alert">{{ store.error() }}</p><button type="button" (click)="store.error.set('')" aria-label="Cerrar aviso">×</button></div> }
+  <div class="blocked-controls"><button type="button" class="text-button" (click)="showBlocked.set(!showBlocked())">{{ showBlocked() ? 'Ocultar bloqueados' : 'Usuarios bloqueados (' + store.social().blocked.length + ')' }}</button></div>
+  @if (showBlocked()) { <div class="blocked-list">@for (user of store.social().blocked; track user.id) { <div><span>{{ '@' + user.username }}</span><button type="button" (click)="change(user, 'unblock')">Desbloquear</button></div> } @empty { <p>No bloqueaste a nadie.</p> }</div> }
+  <div class="statusbar"><span>{{ store.social().friends.length }} amigos</span><span>Solo entre amigos</span></div>
+</section>

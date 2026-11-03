@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NSM: dos amigos cabeza abajo">
+  <g stroke="#245c40" stroke-width="2.2" stroke-linejoin="round">
+    <path fill="#53a876" d="M5 8h25v13c0 9-5 16-12 17C10 36 5 30 5 21Z"/>
+    <circle fill="#79c393" cx="18" cy="49" r="9"/>
+    <path fill="none" stroke="#a8dbb7" stroke-width="2" d="M9 12h17"/>
+  </g>
+  <g stroke="#437a57" stroke-width="2.2" stroke-linejoin="round">
+    <path fill="#a8d3b7" d="M33 4h25v13c0 9-5 16-12 17-8-2-13-8-13-17Z"/>
+    <circle fill="#d2ead8" cx="46" cy="45" r="9"/>
+    <path fill="none" stroke="#eef8ed" stroke-width="2" d="M37 8h17"/>
+  </g>
+</svg>

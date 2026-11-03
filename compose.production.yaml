@@ -1,0 +1,61 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      NSM_DOMAIN: ${NSM_DOMAIN:?Set NSM_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4301
+      TRUST_PROXY: 'true'
+      APP_ORIGIN: https://${NSM_DOMAIN:?Set NSM_DOMAIN}
+      DATABASE_URL: postgresql://nsm:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/nsm
+      CRASH_HOST_USERNAME: ${CRASH_HOST_USERNAME:-admin}
+      CRASH_PROJECT_DIR: /games/crash-bash
+      CRASH_SBI_PATH: /games/crash-bash.sbi
+      CTR_GAME_PATH: /games/ctr.chd
+      CTR_SBI_PATH: /games/ctr.sbi
+      RTC_ICE_SERVERS: ${RTC_ICE_SERVERS:-}
+    volumes:
+      - ${NSM_GAMES_DIR:?Set NSM_GAMES_DIR}:/games:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4301/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+  postgres:
+    image: postgres:17.7-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nsm
+      POSTGRES_DB: nsm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - production-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nsm -d nsm"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  production-postgres:
+  caddy-data:
+  caddy-config:
