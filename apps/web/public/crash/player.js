@@ -4,6 +4,7 @@ import { setupControls } from './player-controls.js';
 import { InputState } from './input-state.js';
 import { captureEmulator } from './emulator-capture.js';
 import { summarizeStats, formatMetrics } from './rtc-metrics.js';
+import { isAppleMobile, preferCompatibleVideo, setVideoProfile, validProfile } from './stream-profile.js';
 
 const $ = selector => document.querySelector(selector);
 document.querySelectorAll('.player-menu').forEach(menu => {
@@ -16,6 +17,15 @@ const base = `/api/games/rooms/${roomId}`;
 const clientId = crypto.randomUUID();
 const peers = new Map();
 const message = text => { $('#status').textContent = text; };
+const quality = $('#stream-quality');
+quality.value = isAppleMobile() || matchMedia('(pointer: coarse)').matches ? 'smooth' : 'balanced';
+try { const saved = localStorage.getItem('nsm.stream.profile'); if (validProfile(saved)) quality.value = saved; } catch {}
+const sendProfile = () => { const channel = peers.get(0)?.channel; if (channel?.readyState === 'open') channel.send(JSON.stringify({ type: 'quality', profile: quality.value })); };
+quality.onchange = () => {
+  try { localStorage.setItem('nsm.stream.profile', quality.value); } catch {}
+  if (player?.seat === 0) for (const entry of peers.values()) void setVideoProfile(entry, quality.value, window.EJS_emulator?.canvas);
+  else sendProfile();
+};
 let player, stream, captureDispose, tabCapture, pollTimer, stopped = false, ack = 0, mask = 0, sequence = 0, started = false, sharing = false;
 const api = async (action, data = {}) => {
   const response = await fetch(`${base}/engine/${action}`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, clientId }), signal: AbortSignal.timeout(10000) });
@@ -53,13 +63,11 @@ async function peer(seat, offer = false) {
   if (player.seat === 0) {
     entry.input = new InputState((index, value) => window.EJS_emulator?.gameManager?.simulateInput(seat, index, value));
     for (const track of stream.getTracks()) {
-      if (track.kind === 'video') track.contentHint = 'detail';
+      if (track.kind === 'video') track.contentHint = 'motion';
       const sender = pc.addTrack(track, stream);
       if (track.kind === 'video') {
-        const params = sender.getParameters();
-        params.encodings = [{ maxBitrate: 6000000, maxFramerate: 50, scaleResolutionDownBy: 1 }];
-        params.degradationPreference = 'maintain-resolution';
-        await sender.setParameters(params).catch(() => {});
+        entry.videoSender = sender;
+        await setVideoProfile(entry, quality.value, window.EJS_emulator?.canvas);
       }
     }
     entry.channel = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
@@ -67,6 +75,7 @@ async function peer(seat, offer = false) {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'input') entry.input.accept(data, performance.now());
+        if ((data.type === 'quality' || data.type === 'ping') && validProfile(data.profile) && data.profile !== entry.profile) void setVideoProfile(entry, data.profile, window.EJS_emulator?.canvas);
         if (data.type === 'ping' && Number.isFinite(data.at)) entry.channel.send(JSON.stringify({ type: 'pong', at: data.at }));
       } catch { /* Ignore malformed or obsolete input packets. */ }
     };
@@ -75,6 +84,8 @@ async function peer(seat, offer = false) {
     const media = new MediaStream();
     pc.ondatachannel = event => {
       entry.channel = event.channel;
+      entry.channel.onopen = sendProfile;
+      if (entry.channel.readyState === 'open') sendProfile();
       entry.channel.onmessage = event => {
         try { const data = JSON.parse(event.data); if (data.type === 'pong' && Number.isFinite(data.at)) $('#metrics').textContent = `Conexión de controles: ${Math.round(performance.now() - data.at)} ms ida y vuelta. No incluye el video.`; } catch { /* Not an input acknowledgement. */ }
       };
@@ -86,6 +97,7 @@ async function peer(seat, offer = false) {
       video.srcObject = media; video.play().catch(() => message('Pulsá Activar sonido para comenzar.')); $('#sound').hidden = false;
     };
   }
+  preferCompatibleVideo(pc);
   if (offer) { await pc.setLocalDescription(await pc.createOffer()); await signal(seat, { type: 'offer', description: pc.localDescription.toJSON() }); }
   return entry;
 }
@@ -97,6 +109,7 @@ async function receive(event) {
     entry ??= await peer(event.from);
     if (!entry) return;
     await entry.pc.setRemoteDescription(event.description);
+    preferCompatibleVideo(entry.pc);
     for (const candidate of entry.pending) await entry.pc.addIceCandidate(candidate);
     entry.pending = []; await entry.pc.setLocalDescription(await entry.pc.createAnswer());
     await signal(event.from, { type: 'answer', description: entry.pc.localDescription.toJSON() });
@@ -127,7 +140,7 @@ async function share(useTabAudio = false) {
     if (!window.EJS_emulator?.gameManager) throw new Error('Primero iniciá el juego.');
     if (useTabAudio) {
       tabCapture = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 5 }, audio: true, preferCurrentTab: true });
-      stream = new MediaStream([...window.EJS_emulator.canvas.captureStream(50).getVideoTracks(), ...tabCapture.getAudioTracks()]);
+      stream = new MediaStream([...window.EJS_emulator.canvas.captureStream(30).getVideoTracks(), ...tabCapture.getAudioTracks()]);
       tabCapture.getVideoTracks()[0].onended = () => { stop(); message('La captura terminó. Volvé a abrir la partida para compartir de nuevo.'); };
     } else { const captured = captureEmulator(window.EJS_emulator); stream = captured.stream; captureDispose = captured.dispose; }
     await api('ready'); sharing = true; ack = 0; clearTimeout(pollTimer); void poll();
@@ -178,7 +191,7 @@ let mobile;
 try { mobile = setupMobilePlayer(next => controls.setTouchMask(next)); }
 catch (error) { console.error('No se pudo preparar la interfaz móvil:', error); }
 const inputTimer = setInterval(transmit, 50);
-const pingTimer = setInterval(() => { const channel = peers.get(0)?.channel; if (!stopped && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'ping', at: performance.now() })); }, 2000);
+const pingTimer = setInterval(() => { const channel = peers.get(0)?.channel; if (!stopped && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'ping', at: performance.now(), profile: quality.value })); }, 2000);
 const heartbeat = setInterval(() => { if (player && !stopped) void api('heartbeat').catch(fail); }, 10000);
 let statsBusy = false;
 const statsTimer = setInterval(async () => {

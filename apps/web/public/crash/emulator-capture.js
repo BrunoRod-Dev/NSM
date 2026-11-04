@@ -1,6 +1,6 @@
 // Adapter for the pinned EmulatorJS 4.2.3 OpenAL audio graph.
 // Connecting a second destination preserves the emulator's speaker output.
-export function captureEmulator(emulator,fps=50){
+export function captureEmulator(emulator,fps=30){
  const canvas=emulator?.canvas;
  const al=emulator?.Module?.AL?.currentCtx;
  if(!canvas?.captureStream||!canvas.width||!canvas.height)throw Error('La imagen del juego todavía no está lista');

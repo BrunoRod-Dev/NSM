@@ -28,3 +28,6 @@ dialog{padding:4px 10px 12px;border:2px solid;border-color:#fff #404040 #404040 
 dialog .dialog-titlebar{margin:0 -6px 12px;background:#0a246a;color:white;padding:3px 4px;min-height:25px}.dialog-titlebar h2{font:bold 12px Tahoma,Arial,sans-serif}.dialog-titlebar button{min-height:19px;line-height:14px;padding:0 5px;font-size:16px}
 dialog fieldset{border:2px groove #eee;margin:10px 0;padding:8px 10px}dialog legend{padding:0 4px}dialog p{font-size:11px;margin:6px 0}dialog label{font-size:12px}dialog button,dialog select{font-size:12px;padding:4px 8px}#bindings{gap:5px 12px;margin:4px 0 10px}.binding button{min-width:76px}.touch-option{margin:8px 0}.connection-settings{margin-top:12px;padding-top:8px}.connection-settings summary{cursor:pointer}
 @media(pointer:coarse){.controls .menu-command,.controls summary{min-height:36px;padding:9px 10px}.player-menu-items button{min-height:40px}dialog .binding button{min-height:36px}}
+
+/* Let the mobile video compositor scale decoded frames normally. */
+#remote-video{image-rendering:auto}
