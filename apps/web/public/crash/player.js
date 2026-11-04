@@ -6,6 +6,11 @@ import { captureEmulator } from './emulator-capture.js';
 import { summarizeStats, formatMetrics } from './rtc-metrics.js';
 
 const $ = selector => document.querySelector(selector);
+document.querySelectorAll('.player-menu').forEach(menu => {
+  menu.addEventListener('toggle', () => { if (menu.open) document.querySelectorAll('.player-menu').forEach(other => { if (other !== menu) other.open = false; }); });
+  menu.addEventListener('click', event => { if (event.target.closest('button')) menu.open = false; });
+});
+document.addEventListener('pointerdown', event => { if (!event.target.closest('.player-menu')) document.querySelectorAll('.player-menu').forEach(menu => { menu.open = false; }); });
 const roomId = location.pathname.split('/')[4];
 const base = `/api/games/rooms/${roomId}`;
 const clientId = crypto.randomUUID();
@@ -169,7 +174,9 @@ function transmit() {
 }
 const localInput = new InputState((index, value) => window.EJS_emulator?.gameManager?.simulateInput(0, index, value));
 const controls = setupControls(next => { mask = next; if (player?.seat === 0) localInput.update(mask); else transmit(); });
-const mobile = setupMobilePlayer(next => controls.setTouchMask(next));
+let mobile;
+try { mobile = setupMobilePlayer(next => controls.setTouchMask(next)); }
+catch (error) { console.error('No se pudo preparar la interfaz móvil:', error); }
 const inputTimer = setInterval(transmit, 50);
 const pingTimer = setInterval(() => { const channel = peers.get(0)?.channel; if (!stopped && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'ping', at: performance.now() })); }, 2000);
 const heartbeat = setInterval(() => { if (player && !stopped) void api('heartbeat').catch(fail); }, 10000);
@@ -180,7 +187,7 @@ const statsTimer = setInterval(async () => {
   try { const stats = summarizeStats(await entry.pc.getStats(), entry.statsPrevious); entry.statsPrevious = stats.next; $('#metrics').textContent = formatMetrics(stats.metrics); } catch { /* Statistics do not interrupt a match. */ }
   finally { statsBusy = false; }
 }, 2000);
-window.addEventListener('pagehide', () => { mobile.dispose(); controls.dispose(); mask = 0; transmit(); stop(); for (const timer of [inputTimer, pingTimer, heartbeat, statsTimer]) clearInterval(timer); });
+window.addEventListener('pagehide', () => { mobile?.dispose(); controls.dispose(); mask = 0; transmit(); stop(); for (const timer of [inputTimer, pingTimer, heartbeat, statsTimer]) clearInterval(timer); });
 try {
   const response = await fetch(`${base}/player`, { cache: 'no-store', credentials: 'same-origin' });
   player = await response.json(); if (!response.ok) throw new Error(player.error || 'No tenés acceso a esta partida.');
