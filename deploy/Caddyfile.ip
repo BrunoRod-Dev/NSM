@@ -1,0 +1,13 @@
+{
+    default_sni {$NSM_DOMAIN}
+}
+
+{$NSM_DOMAIN} {
+    tls {
+        issuer acme {
+            profile shortlived
+        }
+    }
+    encode zstd gzip
+    reverse_proxy app:4301
+}
