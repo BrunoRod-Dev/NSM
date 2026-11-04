@@ -1,11 +1,13 @@
 import { Component, computed, inject, input, output } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
+import { LibraryService } from './library.service';
 import { GamesService } from './games.service';
 import { MessengerService } from '../messenger/messenger.service';
 import { SessionService } from '../accounts/session.service';
 
 @Component({ selector: 'nsm-games', templateUrl: './games.component.html' })
 export class GamesComponent {
+  readonly library = inject(LibraryService);
   readonly games = inject(GamesService);
   readonly messenger = inject(MessengerService);
   readonly inviteable = computed(() => {

@@ -1,5 +1,5 @@
 import { setupMobilePlayer } from './mobile-player.js';
-import { mobileDisc } from './mobile-disc.js';
+import { manifest, localFiles } from './library.js';
 import { configureGame } from './game-adapters.js';
 import { setupControls } from './player-controls.js';
 import { InputState } from './input-state.js';
@@ -166,27 +166,21 @@ async function share(useTabAudio = false) {
   } catch (error) { captureDispose?.(); tabCapture?.getTracks().forEach(track => track.stop()); stream?.getTracks().forEach(track => track.stop()); stream = null; message(error.message); }
   finally { $('#share').disabled = false; }
 }
-let prepareDisc;
 let startupTimer;
 $('#start').onclick = async () => {
   if (started || stopped) return;
   started = true; $('#start').disabled = true;
-  configureGame({ base, player });
-  const arcade = player.game.adapter === 'emulatorjs-neogeo';
-  if (isAppleMobile() && !arcade) {
-    bootMessage('Consultando el disco de ' + player.game.name + '…');
-    prepareDisc ??= mobileDisc(window.EJS_gameUrl, player.gameId, player.host.id);
-    try {
-      window.EJS_gameUrl = await prepareDisc((done, total) => bootMessage(`Descargando ${player.game.name}: ${done} de ${total} MB.`));
-      prepareDisc = null;
-    } catch (error) {
-      started = false;
-      $('#start').disabled = false;
-      $('#start').textContent = 'Reintentar descarga';
-      bootMessage('Descarga del disco: ' + (error instanceof TypeError ? 'conexión interrumpida.' : error.message) + ' Podés reintentar en esta sala.');
-      return;
-    }
+  let files;
+  try {
+    bootMessage('Verificando la instalación local…');
+    files = await localFiles(player.host.id, await manifest(player.gameId));
+  } catch (error) {
+    started = false; $('#start').disabled = false;
+    bootMessage(error.message + ' Cerrá esta sala y abrí el catálogo para descargar o reanudar.');
+    return;
   }
+  configureGame({ base, player, files });
+  const arcade = player.game.adapter === 'emulatorjs-neogeo';
   let stage = 'Preparación del emulador';
   const retryEngine = () => {
     $('#start').disabled = false;

@@ -19,9 +19,25 @@
     <div class="game-roster" aria-label="Jugadores">@for(player of room.players; track player.user.id) { <span>J{{player.seat+1}} · {{player.user.displayName}}{{player.seat===0 ? ' (anfitrión)' : ''}} @if(player.reservedMinutes) { · Esperando reconexión ({{player.reservedMinutes}} min) }</span> }<span class="muted">{{room.ready ? 'En partida' : 'Esperando inicio'}}</span></div>
     @if(frame(); as url) { <iframe class="game-frame" [title]="'Partida de ' + room.game.name" [src]="url" allow="autoplay; fullscreen; gamepad; display-capture"></iframe> }
   } @else {
-    <div class="games-catalog"><div class="games-intro"><div><h2>Biblioteca de juegos</h2><p>Elegí un juego y creá una sala para tus amigos.</p></div></div>
-      <div class="game-cards">@for(game of games.state().catalog; track game.id) { @if(game.enabled) {
-        <article class="game-card"><div class="game-cover" [class.racing]="game.id==='crash-team-racing'" aria-hidden="true">{{game.adapter==='emulatorjs-neogeo' ? 'METAL SLUG' : game.id==='crash-team-racing' ? 'CTR' : 'BASH'}}</div><div class="game-card-body"><div><h3>{{game.name}}</h3><p>Hasta {{game.maxPlayers}} jugadores · Teclado, mando o táctil</p><small>{{game.available ? 'Disponible' : 'Archivos pendientes'}}</small></div><button type="button" [disabled]="!games.state().canHost || !game.available || games.busy()" (click)="games.create(game.id)">Crear sala</button></div></article>
+    <div class="games-catalog"><div class="games-intro"><div><h2>Biblioteca de juegos</h2><p>Descargá una vez y después creá tu sala. Tus invitados entran sin descargar.</p></div></div>
+      <p class="muted">Las descargas ocupan espacio en este dispositivo. Si el navegador las elimina, podés recuperarlas. Borrar un juego conserva sus guardados.</p>@if(library.notice()) { <p role="status">{{library.notice()}}</p> }<div class="game-cards">@for(game of games.state().catalog; track game.id) { @if(game.enabled) {
+        <article class="game-card"><div class="game-cover" [class.racing]="game.id==='crash-team-racing'" aria-hidden="true">{{game.adapter==='emulatorjs-neogeo' ? 'METAL SLUG' : game.id==='crash-team-racing' ? 'CTR' : 'BASH'}}</div><div class="game-card-body"><div><h3>{{game.name}}</h3><p>Hasta {{game.maxPlayers}} jugadores · Teclado, mando o táctil</p><small>{{game.available ? (library.entries()[game.id]?.label ?? 'Consultando…') : 'Archivos pendientes'}}</small>
+@if(library.entries()[game.id]; as entry) {
+<p>{{ (entry.size / 1000000).toFixed(0) }} MB en este dispositivo</p>
+@if(entry.busy) { <progress [value]="entry.progress" max="100" aria-label="Descarga del juego"></progress> }
+}
+</div><div class="button-row">
+@if(library.entries()[game.id]?.busy) {
+<button type="button" (click)="library.pause(game.id)">Pausar descarga</button>
+} @else {
+@if(library.entries()[game.id]?.ready) {
+<button type="button" [disabled]="games.busy()" (click)="library.create(game.id)">Crear sala</button>
+<button type="button" (click)="library.erase(game.id)">Borrar descarga</button>
+} @else {
+<button type="button" [disabled]="!game.available" (click)="library.install(game.id)">Descargar / Reanudar</button>
+}
+}
+</div></div></article>
       } }</div>
       <h3 class="games-section-title">Invitaciones y salas</h3>
       @if(!games.state().incoming.length && !games.state().rooms.length) { <p class="games-empty">No hay invitaciones pendientes.</p> }

@@ -1,3 +1,4 @@
+import { manifest, installed } from '../../../public/crash/library.js';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import type { GameRoom, GamesState } from '../../../../../packages/contracts/src/index';
 import { ApiService } from '../core/api.service';
@@ -42,17 +43,21 @@ export class GamesService {
     finally { if (generation === this.generation) this.refreshing = false; }
   }
   open(room?: GameRoom) { if (room) this.activeId.set(room.id); this.visible.set(true); this.openRequest.update(value => value + 1); }
+  private async requireInstalled(gameId: string) {
+    const owner = this.session.user()?.id;
+    if (!owner || !await installed(owner, await manifest(gameId))) throw new Error('Descargá el juego desde Juegos antes de crear una sala.');
+  }
   async create(gameId: string) {
     if(this.busy()) return;
     this.busy.set(true);this.error.set('');
-    try { const result=await this.api.request<{room:GameRoom}>('/games/rooms','POST',{gameId});await this.refresh();this.open(result.room); }
+    try { await this.requireInstalled(gameId); const result=await this.api.request<{room:GameRoom}>('/games/rooms','POST',{gameId});await this.refresh();this.open(result.room); }
     catch(error){this.error.set(error instanceof Error?error.message:'No se pudo crear la sala.');}
     finally{this.busy.set(false);}
   }
   async invite(targetId: string) {
     if (this.busy()) return;
     this.busy.set(true); this.error.set('');
-    try { const result = await this.api.request<{ room: GameRoom }>('/games/invitations', 'POST', { targetId, gameId: this.activeRoom()?.gameId ?? this.selectedGameId() }); await this.refresh(); this.open(result.room); }
+    try { if (!this.activeRoom()) await this.requireInstalled(this.selectedGameId()); const result = await this.api.request<{ room: GameRoom }>('/games/invitations', 'POST', { targetId, gameId: this.activeRoom()?.gameId ?? this.selectedGameId() }); await this.refresh(); this.open(result.room); }
     catch (error) { this.error.set(error instanceof Error ? error.message : 'No se pudo invitar.'); this.open(); }
     finally { this.busy.set(false); }
   }

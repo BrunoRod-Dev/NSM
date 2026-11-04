@@ -1,12 +1,12 @@
 import { isAppleMobile } from './stream-profile.js';
 
-export function configurePSX({ base, player }, { gameID }) {
+export function configurePSX({ base, player, files }, { gameID }) {
   const appleMobile = isAppleMobile();
   window.EJS_threads = false;
   window.EJS_forceLegacyCores = appleMobile;
-  window.EJS_player = '#game'; window.EJS_core = 'psx'; window.EJS_gameUrl = `${base}/media/game.chd`; window.EJS_biosUrl = `${base}/media/bios.bin`;
+  window.EJS_player = '#game'; window.EJS_core = 'psx'; window.EJS_gameUrl = files['game.chd']; window.EJS_biosUrl = files['bios.bin'];
   window.EJS_gameName = player.game.name; window.EJS_gameID = gameID; window.EJS_pathtodata = 'https://cdn.emulatorjs.org/4.2.3/data/'; window.EJS_language = 'es-ES'; window.EJS_startOnLoaded = false;
-  if (player.hasSbi) window.EJS_externalFiles = { '/game.sbi': `${base}/media/game.sbi` };
+  if (player.hasSbi) window.EJS_externalFiles = { '/game.sbi': files['game.sbi'] };
   window.EJS_Buttons = Object.fromEntries(['playPause','restart','mute','settings','fullscreen','saveState','loadState','screenRecord','gamepad','cheat','volumeSlider','saveSavFiles','loadSavFiles','quickSave','quickLoad','screenshot','cacheManager','exitEmulation','netplay','diskButton','contextMenu'].map(key => [key, false]));
   window.EJS_defaultOptions = { 'virtual-gamepad': 'disabled', ejs_threads: 'disabled', ...(appleMobile ? { webgl2Enabled: 'disabled' } : {}), pcsx_rearmed_multitap: 'port 1', vsync: 'disabled' };
   window.EJS_ready = () => {
@@ -30,9 +30,7 @@ export function configurePSX({ base, player }, { gameID }) {
         try {
           await load.call(this);
           failure = 'No se pudo preparar la BIOS.';
-        const response = await fetch(`${base}/media/bios.bin`);
-        if (!response.ok) throw new Error('No se pudo cargar la BIOS.');
-        this.writeFile('/scph5502.bin', new Uint8Array(await response.arrayBuffer()));
+        this.writeFile('/scph5502.bin', new Uint8Array(await files['bios.bin'].arrayBuffer()));
         failure = 'No se pudieron preparar los datos SBI del disco.';
         if (player.hasSbi && this.FS.stat('/game.sbi').size < 4) throw new Error('No se cargaron los datos del disco.');
         } catch (error) {
