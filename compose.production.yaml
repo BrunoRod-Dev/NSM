@@ -25,6 +25,7 @@ services:
       APP_ORIGIN: https://${NSM_DOMAIN:?Set NSM_DOMAIN}
       DATABASE_URL: postgresql://nsm:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/nsm
       CRASH_HOST_USERNAME: ${CRASH_HOST_USERNAME:-admin}
+      NEOGEO_PROJECT_DIR: /games/neogeo
       CRASH_PROJECT_DIR: /games/crash-bash
       CRASH_SBI_PATH: /games/crash-bash.sbi
       CTR_GAME_PATH: /games/ctr.chd

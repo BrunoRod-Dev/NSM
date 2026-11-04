@@ -1,6 +1,9 @@
 export const actions = [[4,'Arriba','KeyW',12],[5,'Abajo','KeyS',13],[6,'Izquierda','KeyA',14],[7,'Derecha','KeyD',15],[0,'Cruz / A','Numpad2',0],[8,'Círculo / B','Numpad6',1],[1,'Cuadrado / X','Numpad4',2],[9,'Triángulo / Y','Numpad8',3],[3,'Start','Enter',9],[2,'Select','ShiftRight',8],[10,'L1 / LB','KeyQ',4],[11,'R1 / RB','KeyE',5],[12,'L2 / LT','KeyZ',6],[13,'R2 / RT','KeyC',7]];
 export function setupControls(write) {
  const $=s=>document.querySelector(s),dialog=$('#controls-dialog'),device=$('#device');
+ const arcadeLabels = new Map([[0, 'Disparo'], [8, 'Salto'], [1, 'Granada'], [9, 'Acción'], [2, 'Ficha']]);
+ let arcade = false;
+ window.addEventListener('nsm:arcade-controls', () => { arcade = true; render(); });
  let bindings=Object.fromEntries(actions.map(([id,,key,pad])=>[id,{key,pad}]));
  try {const saved=JSON.parse(localStorage.getItem('nsm.crash.controls.v1'));for(const [id] of actions)if(typeof saved?.[id]?.key==='string'&&Number.isInteger(saved[id].pad)&&saved[id].pad>=0&&saved[id].pad<32)bindings[id]=saved[id];}catch{}
  let touchMask=0;
@@ -9,7 +12,7 @@ export function setupControls(write) {
  const save=()=>{try{localStorage.setItem('nsm.crash.controls.v1',JSON.stringify(bindings));}catch{}render();};
  function render(){
   $('#bindings').replaceChildren(...actions.map(([id,label])=>{
-   const row=document.createElement('label');row.className='binding';row.append(document.createTextNode(label));
+   const row=document.createElement('label');row.className='binding';row.append(document.createTextNode(arcade ? arcadeLabels.get(id) ?? label : label));
    const button=document.createElement('button');button.textContent=remap===id?'Presioná…':device.value==='keyboard'?bindings[id].key.replace('Key','').replace('Numpad','Num '):'Botón '+bindings[id].pad;
    button.setAttribute('aria-label','Cambiar '+label);button.onclick=()=>{release();remap=id;render();};row.append(button);return row;
   }));

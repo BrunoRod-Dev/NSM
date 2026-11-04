@@ -51,12 +51,13 @@ export async function registerGameRoutes(app: FastifyInstance, games: GamesServi
     return reply.type('text/html; charset=utf-8').send(await readFile(resolve('apps/web/public/crash/player.html'), 'utf8'));
   });
   app.get('/api/games/rooms/:id/media/:file', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (request, reply) => {
-    const { id, file } = z.object({ id: idSchema, file: z.enum(['game.chd', 'bios.bin', 'loader.js', 'game.sbi']) }).parse(request.params);
+    const { id, file } = z.object({ id: idSchema, file: z.enum(['game.chd', 'bios.bin', 'loader.js', 'game.sbi', 'mslug.zip', 'mslug2.zip', 'mslugx.zip', 'mslug3.zip', 'mslug4.zip', 'mslug5.zip', 'neogeo.zip']) }).parse(request.params);
     const { room, member } = await games.authorize((await identity(request)).user, id);
     if (member.seat !== 0) throw forbidden();
     const files = await games.files(room.gameId);
     if (!files) throw new AppError(503, 'No se encuentran los archivos del juego.');
-    const path = file === 'game.chd' ? files.game : file === 'bios.bin' ? files.bios : file === 'game.sbi' ? files.sbi : files.loader;
+    if (file.endsWith('.zip') && files.game.split(/[\\/]/).pop() !== file && file !== 'neogeo.zip') throw forbidden();
+    const path = file === 'neogeo.zip' ? files.bios : file.endsWith('.zip') ? files.game : file === 'game.chd' ? files.game : file === 'bios.bin' ? files.bios : file === 'game.sbi' ? files.sbi : files.loader;
     if (!path) throw new AppError(404, 'No se configuraron los datos complementarios del disco.');
     const info = await stat(path);
     if (file === 'game.chd') {

@@ -29,8 +29,19 @@ export interface ServerEvents {
 }
 export interface ClientEvents { 'message:send': (input: z.infer<typeof messageInputSchema>, callback: (result: SendResult) => void) => void }
 
-export interface GameDefinition { id: string; name: string; maxPlayers: number; enabled: boolean; adapter: 'emulatorjs-psx' }
+export interface GameDefinition { id: string; name: string; maxPlayers: number; enabled: boolean; adapter: 'emulatorjs-psx' | 'emulatorjs-neogeo' }
+// Arcade titles stay disabled until their exact ROM set and two-player boot
+// have been validated against the pinned emulator core.
+export const metalSlugDefinitions: readonly GameDefinition[] = [
+  { id: 'metal-slug', name: 'Metal Slug', maxPlayers: 2, enabled: false, adapter: 'emulatorjs-neogeo' },
+  { id: 'metal-slug-2', name: 'Metal Slug 2', maxPlayers: 2, enabled: false, adapter: 'emulatorjs-neogeo' },
+  { id: 'metal-slug-x', name: 'Metal Slug X', maxPlayers: 2, enabled: false, adapter: 'emulatorjs-neogeo' },
+  { id: 'metal-slug-3', name: 'Metal Slug 3', maxPlayers: 2, enabled: false, adapter: 'emulatorjs-neogeo' },
+  { id: 'metal-slug-4', name: 'Metal Slug 4', maxPlayers: 2, enabled: false, adapter: 'emulatorjs-neogeo' },
+  { id: 'metal-slug-5', name: 'Metal Slug 5', maxPlayers: 2, enabled: false, adapter: 'emulatorjs-neogeo' },
+];
 export const gameDefinitions: readonly GameDefinition[] = [
+  ...metalSlugDefinitions,
   { id: 'crash-bash', name: 'Crash Bash', maxPlayers: 4, enabled: true, adapter: 'emulatorjs-psx' },
   { id: 'crash-team-racing', name: 'Crash Team Racing', maxPlayers: 4, enabled: true, adapter: 'emulatorjs-psx' },
 ];

@@ -82,7 +82,7 @@ export class GamesService {
       const existing = [...this.invitations.values()].find(i => i.roomId === room!.id && i.to.id === targetId);
       if (existing) return { room: this.view(room) };
       const pending = [...this.invitations.values()].filter(i => i.roomId === room!.id).length;
-      if (room.members.size + pending >= game.maxPlayers) throw new AppError(409, 'La partida ya tiene sus cuatro plazas ocupadas o reservadas.');
+      if (room.members.size + pending >= game.maxPlayers) throw new AppError(409, 'La partida ya tiene todas sus plazas ocupadas o reservadas.');
       const invitation: GameInvitation = { id: randomUUID(), roomId: room.id, gameId, game, from: user, to: target, expiresAt: new Date(Date.now() + 300000).toISOString() };
       this.invitations.set(invitation.id, invitation);
       this.emit(room);

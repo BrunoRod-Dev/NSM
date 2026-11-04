@@ -14,6 +14,14 @@ export function setupMobilePlayer(write) {
     <div class="touch-system"><button data-input="2">SELECT</button><button data-input="3">START</button></div>
     <div class="touch-shoulders touch-right"><button data-input="11">R1</button><button data-input="13">R2</button></div>
     <div class="touch-face"><button class="triangle" data-input="9" aria-label="Triángulo">△</button><button class="square" data-input="1" aria-label="Cuadrado">□</button><button class="circle" data-input="8" aria-label="Círculo">○</button><button class="cross" data-input="0" aria-label="Cruz">×</button></div>`;
+  window.addEventListener('nsm:arcade-controls', () => {
+    root.querySelectorAll('.touch-shoulders').forEach(node => node.hidden = true);
+    for (const [input, label] of [[0, 'Disparo'], [8, 'Salto'], [1, 'Granada'], [9, 'Acción'], [2, 'Ficha']]) {
+      const button = root.querySelector('button[data-input="' + input + '"]');
+      button.textContent = label;
+      button.setAttribute('aria-label', label);
+    }
+  }, { signal: abort.signal });
   const emit = () => { let mask = 0; for (const value of pointers.values()) mask |= value.mask; write(mask); };
   function release() { pointers.clear(); root.querySelectorAll('.held').forEach(button => button.classList.remove('held')); write(0); }
   function apply() { toggle.checked = enabled; root.hidden = !enabled; document.body.classList.toggle('touch-enabled', enabled); release(); }

@@ -172,7 +172,8 @@ $('#start').onclick = async () => {
   if (started || stopped) return;
   started = true; $('#start').disabled = true;
   configureGame({ base, player });
-  if (isAppleMobile()) {
+  const arcade = player.game.adapter === 'emulatorjs-neogeo';
+  if (isAppleMobile() && !arcade) {
     bootMessage('Consultando el disco de ' + player.game.name + '…');
     prepareDisc ??= mobileDisc(window.EJS_gameUrl, player.gameId, player.host.id);
     try {
@@ -208,7 +209,8 @@ $('#start').onclick = async () => {
   window.EJS_onGameStart = () => {
     clearTimeout(startupTimer);
     const manager = window.EJS_emulator?.gameManager;
-    manager?.functions?.setVariable('pcsx_rearmed_multitap', 'port 1'); manager?.setVSync(false);
+    if (!arcade) manager?.functions?.setVariable('pcsx_rearmed_multitap', 'port 1');
+    manager?.setVSync(false);
     $('#start').hidden = true;
     $('#save-export').hidden = false;
     $('#save-import').hidden = false;
@@ -329,6 +331,7 @@ try {
   player = await response.json(); if (!response.ok) throw new Error(player.error || 'No tenés acceso a esta partida.');
   document.querySelector('.controls strong').textContent = player.game.name;
   document.title = player.game.name + ' · NSM';
+  if (player.game.adapter === 'emulatorjs-neogeo') window.dispatchEvent(new Event('nsm:arcade-controls'));
   $('#seat').textContent = `Jugador ${player.seat + 1}`;
   $('#instructions').textContent = player.seat === 0 ? 'Este dispositivo descarga y ejecuta el juego. Mantené esta pestaña abierta. El progreso queda en este navegador.' : 'El anfitrión ejecuta el juego. En celular, usá el joystick táctil. Con teclado: WASD para mover y Enter para Start.';
   if (player.seat === 0) {

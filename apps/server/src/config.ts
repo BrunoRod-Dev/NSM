@@ -8,6 +8,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   TRUST_PROXY: z.enum(['true','false']).optional(),
   SESSION_DAYS: z.coerce.number().int().min(1).max(30).default(7),
+  NEOGEO_PROJECT_DIR: z.string().optional(),
   CRASH_PROJECT_DIR: z.string().optional(),
   CRASH_HOST_USERNAME: z.string().trim().toLowerCase().optional(),
   CRASH_SBI_PATH: z.string().optional(),
