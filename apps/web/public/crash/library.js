@@ -2,7 +2,18 @@ const blockSize = 8 * 1024 * 1024;
 const cacheName = 'nsm-library-v1';
 const hex = bytes => [...new Uint8Array(bytes)].map(n => n.toString(16).padStart(2, '0')).join('');
 const digest = async bytes => hex(await crypto.subtle.digest('SHA-256', bytes));
-const key = (owner, game, asset, index) => new URL('/.nsm-library/' + [owner, game, asset.sha256, index].map(encodeURIComponent).join('/'), location.origin).href;
+const key = (owner, game, asset, index) => new URL('/.nsm-library/' + [owner, asset.scope ?? game, asset.sha256, index].map(encodeURIComponent).join('/'), location.origin).href;
+async function cached(cache, owner, game, asset, index) {
+  const current = key(owner, game, asset, index);
+  let response = await cache.match(current);
+  if (!response && asset.scope && asset.scope !== game) {
+    response = await cache.match(key(owner, game, { ...asset, scope: game }, index));
+    if (response) {
+      try { await cache.put(current, response.clone()); } catch { /* Existing game copy remains usable. */ }
+    }
+  }
+  return response;
+}
 export async function manifest(game) {
   const response = await fetch('/api/games/library/' + encodeURIComponent(game), { cache: 'no-store', credentials: 'same-origin' });
   if (!response.ok) throw new Error('No se pudo consultar el juego. Revisá tu conexión o volvé a iniciar sesión.');
@@ -11,7 +22,7 @@ export async function manifest(game) {
 export async function installed(owner, data) {
   const cache = await caches.open(cacheName);
   for (const asset of data.assets) for (let i = 0; i < asset.chunks.length; i++) {
-    const response = await cache.match(key(owner, data.gameId, asset, i));
+    const response = await cached(cache, owner, data.gameId, asset, i);
     if (!response || Number(response.headers.get('Content-Length')) !== Math.min(blockSize, asset.size - i * blockSize)) return false;
   }
   return true;
@@ -26,7 +37,7 @@ export async function download(owner, data, report, signal) {
     signal?.throwIfAborted();
     const url = key(owner, data.gameId, asset, i);
     const start = i * blockSize, length = Math.min(blockSize, asset.size - start);
-    const saved = await cache.match(url);
+    const saved = await cached(cache, owner, data.gameId, asset, i);
     if (saved) {
       if (await digest(await saved.arrayBuffer()) === asset.chunks[i]) { done += length; report(done, total); continue; }
       await cache.delete(url);
@@ -61,7 +72,7 @@ export async function localFiles(owner, data) {
   for (const asset of data.assets) {
     const parts = [];
     for (let i = 0; i < asset.chunks.length; i++) {
-      const response = await cache.match(key(owner, data.gameId, asset, i));
+      const response = await cached(cache, owner, data.gameId, asset, i);
       if (!response) throw new Error('Faltan archivos locales. Volvé al catálogo y descargá el juego.');
       const blob = await response.blob();
       if (await digest(await blob.arrayBuffer()) !== asset.chunks[i]) {

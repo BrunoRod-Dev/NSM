@@ -4,7 +4,7 @@ export function configurePSX({ base, player, files }, { gameID }) {
   const appleMobile = isAppleMobile();
   window.EJS_threads = false;
   window.EJS_forceLegacyCores = appleMobile;
-  window.EJS_player = '#game'; window.EJS_core = 'psx'; window.EJS_gameUrl = files['game.chd']; window.EJS_biosUrl = files['bios.bin'];
+  window.EJS_player = '#game'; window.EJS_core = 'psx'; window.EJS_gameUrl = files['game.chd']; window.EJS_biosUrl = '';
   window.EJS_gameName = player.game.name; window.EJS_gameID = gameID; window.EJS_pathtodata = 'https://cdn.emulatorjs.org/4.2.3/data/'; window.EJS_language = 'es-ES'; window.EJS_startOnLoaded = false;
   if (player.hasSbi) window.EJS_externalFiles = { '/game.sbi': files['game.sbi'] };
   window.EJS_Buttons = Object.fromEntries(['playPause','restart','mute','settings','fullscreen','saveState','loadState','screenRecord','gamepad','cheat','volumeSlider','saveSavFiles','loadSavFiles','quickSave','quickLoad','screenshot','cacheManager','exitEmulation','netplay','diskButton','contextMenu'].map(key => [key, false]));

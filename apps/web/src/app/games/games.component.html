@@ -20,7 +20,7 @@
     @if(frame(); as url) { <iframe class="game-frame" [title]="'Partida de ' + room.game.name" [src]="url" allow="autoplay; fullscreen; gamepad; display-capture"></iframe> }
   } @else {
     <div class="games-catalog"><div class="games-intro"><div><h2>Biblioteca de juegos</h2><p>Descargá una vez y después creá tu sala. Tus invitados entran sin descargar.</p></div></div>
-      <p class="muted">Las descargas ocupan espacio en este dispositivo. Si el navegador las elimina, podés recuperarlas. Borrar un juego conserva sus guardados.</p>@if(library.notice()) { <p role="status">{{library.notice()}}</p> }<div class="game-cards">@for(game of games.state().catalog; track game.id) { @if(game.enabled) {
+      <p class="muted">Las descargas ocupan espacio en este dispositivo. Si el navegador las elimina, podés recuperarlas. Borrar un juego conserva sus guardados.</p>@if(library.notice()) { <p role="status">{{library.notice()}}</p> }@for(platform of consoles; track platform.id) { @if(consoleGames(platform.id).length) { <h3>{{platform.name}}</h3><p class="muted">{{platform.help}}</p><div class="game-cards">@for(game of consoleGames(platform.id); track game.id) {
         <article class="game-card"><div class="game-cover" [class.racing]="game.id==='crash-team-racing'" aria-hidden="true">{{game.adapter==='emulatorjs-neogeo' ? 'METAL SLUG' : game.id==='crash-team-racing' ? 'CTR' : 'BASH'}}</div><div class="game-card-body"><div><h3>{{game.name}}</h3><p>Hasta {{game.maxPlayers}} jugadores · Teclado, mando o táctil</p><small>{{game.available ? (library.entries()[game.id]?.label ?? 'Consultando…') : 'Archivos pendientes'}}</small>
 @if(library.entries()[game.id]; as entry) {
 <p>{{ (entry.size / 1000000).toFixed(0) }} MB en este dispositivo</p>
@@ -38,7 +38,7 @@
 }
 }
 </div></div></article>
-      } }</div>
+      }</div> } }
       <h3 class="games-section-title">Invitaciones y salas</h3>
       @if(!games.state().incoming.length && !games.state().rooms.length) { <p class="games-empty">No hay invitaciones pendientes.</p> }
       @for(invitation of games.state().incoming; track invitation.id) { <article class="game-invitation"><strong>{{invitation.from.displayName}} te invitó a {{invitation.game.name}}</strong><div class="button-row"><button type="button" [disabled]="games.busy()" (click)="games.respond(invitation.id,true)">Aceptar</button><button type="button" [disabled]="games.busy()" (click)="games.respond(invitation.id,false)">Rechazar</button></div></article> }

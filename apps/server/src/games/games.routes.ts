@@ -44,7 +44,7 @@ export async function registerGameRoutes(app: FastifyInstance, games: GamesServi
         } finally { await handle.close(); }
         digest = { sha256: hash.digest('hex'), chunks }; digests.set(key, digest);
       }
-      assets.push({ name, size: info.size, sha256: digest.sha256, chunks: digest.chunks, url: '/api/games/library/' + gameId + '/media/' + name });
+      assets.push({ name, scope: name === 'bios.bin' ? 'console-' + games.catalog.definition(gameId).console : gameId, size: info.size, sha256: digest.sha256, chunks: digest.chunks, url: '/api/games/library/' + gameId + '/media/' + name });
     }
     return { gameId, assets };
   });

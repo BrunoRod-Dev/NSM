@@ -10,6 +10,11 @@ export class GamesComponent {
   readonly library = inject(LibraryService);
   readonly games = inject(GamesService);
   readonly messenger = inject(MessengerService);
+  readonly consoles = [
+    { id: 'ps1', name: 'PlayStation 1', help: 'La BIOS de PlayStation se instala con el primer juego y se comparte entre títulos compatibles.' },
+    { id: 'neogeo', name: 'Neo Geo · Arcade', help: 'BIOS y juegos arcade se validan por separado antes de habilitarlos.' },
+  ];
+  consoleGames(id: string) { return this.games.state().catalog.filter(game => game.enabled && game.console === id); }
   readonly inviteable = computed(() => {
     const room=this.games.activeRoom();
     return this.messenger.social().friends.filter(friend => !room?.players.some(p=>p.user.id===friend.id));
