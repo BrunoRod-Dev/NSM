@@ -15,7 +15,7 @@
     <div class="games-catalog">
       <div class="games-intro"><span class="games-mark" aria-hidden="true">✚</span><div><h2>Nos vemos en la próxima partida.</h2><p>Elegí un juego, creá tu sala y sumá a tus amigos.</p></div></div>
       <div class="game-cards">@for (game of games.state().catalog; track game.id) { @if(game.enabled) {
-        <article class="game-card"><div class="game-cover" [class.racing]="game.id === 'crash-team-racing'" aria-hidden="true">{{ game.id === 'crash-team-racing' ? 'CTR' : 'BASH' }}</div><div class="game-card-body"><h3>{{game.name}}</h3><p>Hasta {{game.maxPlayers}} jugadores · Teclado o mando</p><small>{{game.available ? 'Disponible' : 'Archivos pendientes de configurar'}}</small><button type="button" [disabled]="!games.state().canHost || !game.available || games.busy()" (click)="games.create(game.id)">Crear sala de {{game.name}}</button></div></article>
+        <article class="game-card"><div class="game-cover" [class.racing]="game.id === 'crash-team-racing'" aria-hidden="true">{{ game.id === 'crash-team-racing' ? 'CTR' : 'BASH' }}</div><div class="game-card-body"><h3>{{game.name}}</h3><p>Hasta {{game.maxPlayers}} jugadores · Teclado, mando o t�ctil</p><small>{{game.available ? 'Disponible' : 'Archivos pendientes de configurar'}}</small><button type="button" [disabled]="!games.state().canHost || !game.available || games.busy()" (click)="games.create(game.id)">Crear sala de {{game.name}}</button></div></article>
       } }</div>
       @if(!games.state().canHost) { <p class="inset-note">Por ahora el anfitrión crea la sala. Sus invitaciones aparecen acá.</p> }
       <h3 class="games-section-title">Invitaciones y salas</h3>

@@ -1,3 +1,4 @@
+import { setupMobilePlayer } from './mobile-player.js';
 import { configureGame } from './game-adapters.js';
 import { setupControls } from './player-controls.js';
 import { InputState } from './input-state.js';
@@ -155,8 +156,6 @@ $('#start').onclick = () => {
 };
 $('#share').onclick = () => share(); $('#tab-share').onclick = () => share(true);
 $('#sound').onclick = async () => { const video = $('#remote-video'); if (!video) return; video.muted = false; try { await video.play(); $('#sound').textContent = 'Sonido activado'; } catch { video.muted = true; message('Volvé a pulsar Activar sonido.'); } };
-$('#fullscreen').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.body.requestFullscreen(); } catch { message('No se pudo activar pantalla completa.'); } };
-document.addEventListener('fullscreenchange', () => { $('#fullscreen').textContent = document.fullscreenElement ? 'Salir de pantalla completa' : 'Pantalla completa'; });
 $('#reconnect').onclick = async () => {
   if (!player?.seat || stopped) return;
   $('#reconnect').disabled = true;
@@ -170,6 +169,7 @@ function transmit() {
 }
 const localInput = new InputState((index, value) => window.EJS_emulator?.gameManager?.simulateInput(0, index, value));
 const controls = setupControls(next => { mask = next; if (player?.seat === 0) localInput.update(mask); else transmit(); });
+const mobile = setupMobilePlayer(next => controls.setTouchMask(next));
 const inputTimer = setInterval(transmit, 50);
 const pingTimer = setInterval(() => { const channel = peers.get(0)?.channel; if (!stopped && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'ping', at: performance.now() })); }, 2000);
 const heartbeat = setInterval(() => { if (player && !stopped) void api('heartbeat').catch(fail); }, 10000);
@@ -180,7 +180,7 @@ const statsTimer = setInterval(async () => {
   try { const stats = summarizeStats(await entry.pc.getStats(), entry.statsPrevious); entry.statsPrevious = stats.next; $('#metrics').textContent = formatMetrics(stats.metrics); } catch { /* Statistics do not interrupt a match. */ }
   finally { statsBusy = false; }
 }, 2000);
-window.addEventListener('pagehide', () => { controls.dispose(); mask = 0; transmit(); stop(); for (const timer of [inputTimer, pingTimer, heartbeat, statsTimer]) clearInterval(timer); });
+window.addEventListener('pagehide', () => { mobile.dispose(); controls.dispose(); mask = 0; transmit(); stop(); for (const timer of [inputTimer, pingTimer, heartbeat, statsTimer]) clearInterval(timer); });
 try {
   const response = await fetch(`${base}/player`, { cache: 'no-store', credentials: 'same-origin' });
   player = await response.json(); if (!response.ok) throw new Error(player.error || 'No tenés acceso a esta partida.');

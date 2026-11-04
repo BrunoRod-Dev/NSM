@@ -3,8 +3,9 @@ export function setupControls(write) {
  const $=s=>document.querySelector(s),dialog=$('#controls-dialog'),device=$('#device');
  let bindings=Object.fromEntries(actions.map(([id,,key,pad])=>[id,{key,pad}]));
  try {const saved=JSON.parse(localStorage.getItem('nsm.crash.controls.v1'));for(const [id] of actions)if(typeof saved?.[id]?.key==='string'&&Number.isInteger(saved[id].pad)&&saved[id].pad>=0&&saved[id].pad<32)bindings[id]=saved[id];}catch{}
+ let touchMask=0;
  let pressed=new Set(),remap=null,oldButtons=[],lastMask=0,alive=true,padList='',frame;
- const release=()=>{pressed.clear();lastMask=0;write(0);};
+ const release=()=>{pressed.clear();touchMask=0;window.dispatchEvent(new Event("nsm:release-touch"));lastMask=0;write(0);};
  const save=()=>{try{localStorage.setItem('nsm.crash.controls.v1',JSON.stringify(bindings));}catch{}render();};
  function render(){
   $('#bindings').replaceChildren(...actions.map(([id,label])=>{
@@ -36,11 +37,12 @@ export function setupControls(write) {
   oldButtons=pad?.buttons.map(b=>b.pressed)??[];
   let mask=0;
   if(!dialog.open&&document.hasFocus()&&!document.hidden){
+   mask=touchMask;
    for(const [id] of actions)if(device.value==='keyboard'?pressed.has(bindings[id].key):pad?.buttons[bindings[id].pad]?.pressed)mask|=1<<id;
    if(pad){if(pad.axes[0]<-0.35)mask|=1<<6;if(pad.axes[0]>0.35)mask|=1<<7;if(pad.axes[1]<-0.35)mask|=1<<4;if(pad.axes[1]>0.35)mask|=1<<5;}
   }
   if(mask!==lastMask){lastMask=mask;write(mask);}
  }
  function tick(){if(!alive)return;update();frame=requestAnimationFrame(tick);}
- render();tick();return{dispose(){release();alive=false;cancelAnimationFrame(frame);}};
+ render();tick();return{setTouchMask(next){touchMask=next;update();},dispose(){release();alive=false;cancelAnimationFrame(frame);}};
 }
