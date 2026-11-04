@@ -51,6 +51,7 @@ export function setupMobilePlayer(write) {
   listen(root, 'contextmenu', event => event.preventDefault());
   listen(window, 'nsm:release-touch', release);
   listen(window, 'blur', release);
+  listen(window, 'orientationchange', release);
   listen(document, 'visibilitychange', () => { if (document.hidden) release(); });
   listen(toggle, 'change', () => { enabled = toggle.checked; try { localStorage.setItem('nsm.touch.enabled', String(enabled)); } catch {} apply(); });
   function setExpanded(value) {

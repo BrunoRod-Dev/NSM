@@ -26,11 +26,19 @@ export function configurePSX({ base, player }, { gameID }) {
     if (prototype?.loadExternalFiles) {
       const load = prototype.loadExternalFiles;
       prototype.loadExternalFiles = async function() {
-        await load.call(this);
+        let failure = 'No se pudieron preparar los archivos complementarios del disco.';
+        try {
+          await load.call(this);
+          failure = 'No se pudo preparar la BIOS.';
         const response = await fetch(`${base}/media/bios.bin`);
         if (!response.ok) throw new Error('No se pudo cargar la BIOS.');
         this.writeFile('/scph5502.bin', new Uint8Array(await response.arrayBuffer()));
+        failure = 'No se pudieron preparar los datos SBI del disco.';
         if (player.hasSbi && this.FS.stat('/game.sbi').size < 4) throw new Error('No se cargaron los datos del disco.');
+        } catch (error) {
+          window.dispatchEvent(new CustomEvent('nsm:boot-error', { detail: failure }));
+          throw error;
+        }
       };
     }
     if (prototype?.getRetroArchCfg) {

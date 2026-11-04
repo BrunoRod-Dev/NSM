@@ -59,6 +59,21 @@ export async function registerGameRoutes(app: FastifyInstance, games: GamesServi
     const path = file === 'game.chd' ? files.game : file === 'bios.bin' ? files.bios : file === 'game.sbi' ? files.sbi : files.loader;
     if (!path) throw new AppError(404, 'No se configuraron los datos complementarios del disco.');
     const info = await stat(path);
+    if (file === 'game.chd') {
+      const version = '"' + info.size + '-' + Math.trunc(info.mtimeMs) + '"';
+      reply.header('Accept-Ranges', 'bytes').header('ETag', version);
+      const range = request.headers.range;
+      if (range && (!request.headers['if-range'] || request.headers['if-range'] === version)) {
+        const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+        const start = match?.[1] ? Number(match[1]) : Math.max(0, info.size - Number(match?.[2]));
+        const end = match?.[1] && match[2] ? Math.min(info.size - 1, Number(match[2])) : info.size - 1;
+        if (!match || !(match[1] || match[2]) || !Number.isSafeInteger(start) || start > end) {
+          return reply.code(416).header('Content-Range', 'bytes */' + info.size).send();
+        }
+        return reply.code(206).header('Content-Range', `bytes ${start}-${end}/${info.size}`)
+          .header('Content-Length', end - start + 1).type('application/octet-stream').send(createReadStream(path, { start, end }));
+      }
+    }
     reply.header('Content-Length', info.size).type(file === 'loader.js' ? 'text/javascript' : 'application/octet-stream');
     return reply.send(createReadStream(path));
   });

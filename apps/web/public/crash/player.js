@@ -1,4 +1,5 @@
 import { setupMobilePlayer } from './mobile-player.js';
+import { mobileDisc } from './mobile-disc.js';
 import { configureGame } from './game-adapters.js';
 import { setupControls } from './player-controls.js';
 import { InputState } from './input-state.js';
@@ -57,6 +58,8 @@ async function peer(seat, offer = false) {
   peers.set(seat, entry);
   pc.onicecandidate = event => { if (event.candidate && !stopped) signal(seat, { type: 'ice', candidate: event.candidate.toJSON() }).catch(fail); };
   pc.onconnectionstatechange = () => {
+    if (peers.get(seat) !== entry) return;
+    if (player.seat > 0) $('#reconnect').hidden = !['failed', 'disconnected', 'closed'].includes(pc.connectionState);
     message(`Jugador ${seat + 1}: ${pc.connectionState === 'connected' ? 'conectado' : pc.connectionState}`);
     if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) entry.input?.release();
   };
@@ -74,9 +77,10 @@ async function peer(seat, offer = false) {
     entry.channel.onmessage = event => {
       try {
         const data = JSON.parse(event.data);
+        if (data.type === 'ping') entry.remoteFps = data.fps;
         if (data.type === 'input') entry.input.accept(data, performance.now());
         if ((data.type === 'quality' || data.type === 'ping') && validProfile(data.profile) && data.profile !== entry.profile) void setVideoProfile(entry, data.profile, window.EJS_emulator?.canvas);
-        if (data.type === 'ping' && Number.isFinite(data.at)) entry.channel.send(JSON.stringify({ type: 'pong', at: data.at }));
+        if (data.type === 'ping' && Number.isFinite(data.at)) entry.channel.send(JSON.stringify({ type: 'pong', at: data.at, fps: entry.localFps }));
       } catch { /* Ignore malformed or obsolete input packets. */ }
     };
     entry.watchdog = setInterval(() => entry.input.expire(performance.now()), 250);
@@ -87,7 +91,7 @@ async function peer(seat, offer = false) {
       entry.channel.onopen = sendProfile;
       if (entry.channel.readyState === 'open') sendProfile();
       entry.channel.onmessage = event => {
-        try { const data = JSON.parse(event.data); if (data.type === 'pong' && Number.isFinite(data.at)) $('#metrics').textContent = `Conexión de controles: ${Math.round(performance.now() - data.at)} ms ida y vuelta. No incluye el video.`; } catch { /* Not an input acknowledgement. */ }
+        try { const data = JSON.parse(event.data); if (data.type === 'pong') entry.remoteFps = data.fps; } catch { /* Not an input acknowledgement. */ }
       };
     };
     pc.ontrack = event => {
@@ -123,12 +127,17 @@ async function receive(event) {
     if (entry.pc.remoteDescription) await entry.pc.addIceCandidate(event.candidate); else entry.pending.push(event.candidate);
   }
 }
-async function poll() {
+let pendingPoll;
+function poll() {
+  if (!pendingPoll) pendingPoll = pollOnce().finally(() => { pendingPoll = undefined; });
+  return pendingPoll;
+}
+async function pollOnce() {
   if (stopped || (player.seat === 0 && !sharing)) return;
   try {
     const data = await api('poll', { ack });
     if (stopped) return;
-    if (player.seat > 0 && !data.ready) message(`Esperando que ${player.host.displayName} inicie y comparta el juego…`);
+    if (player.seat > 0 && !data.ready) message(`${player.host.displayName} está preparando el juego. Entrás sin descargar el disco.`);
     for (const event of data.events) { if (stopped) return; await receive(event); ack = event.eventId; }
   } catch (error) { fail(error); }
   if (!stopped) pollTimer = setTimeout(poll, 500);
@@ -149,11 +158,47 @@ async function share(useTabAudio = false) {
   } catch (error) { captureDispose?.(); tabCapture?.getTracks().forEach(track => track.stop()); stream?.getTracks().forEach(track => track.stop()); stream = null; message(error.message); }
   finally { $('#share').disabled = false; }
 }
-$('#start').onclick = () => {
+let prepareDisc;
+let startupTimer;
+$('#start').onclick = async () => {
   if (started || stopped) return;
   started = true; $('#start').disabled = true;
   configureGame({ base, player });
+  if (isAppleMobile()) {
+    message('Consultando el disco de ' + player.game.name + '…');
+    prepareDisc ??= mobileDisc(window.EJS_gameUrl, player.gameId, player.host.id);
+    try {
+      window.EJS_gameUrl = await prepareDisc((done, total) => message(`Descargando ${player.game.name}: ${done} de ${total} MB.`));
+      prepareDisc = null;
+    } catch (error) {
+      started = false;
+      $('#start').disabled = false;
+      $('#start').textContent = 'Reintentar descarga';
+      message('Descarga del disco: ' + (error instanceof TypeError ? 'conexión interrumpida.' : error.message) + ' Podés reintentar en esta sala.');
+      return;
+    }
+  }
+  let stage = 'Preparación del emulador';
+  const retryEngine = () => {
+    $('#start').disabled = false;
+    $('#start').textContent = 'Reintentar inicio';
+    $('#start').onclick = () => location.reload();
+    message(stage + ' está demorando. Podés esperar, reintentar o pedirle a un amigo que cree la sala y te invite.');
+  };
+  window.addEventListener('nsm:boot-error', event => {
+    clearTimeout(startupTimer);
+    retryEngine();
+    message(event.detail + ' Reintentá o pedile a un amigo que cree la sala y te invite.');
+  }, { once: true });
+  startupTimer = setTimeout(retryEngine, 120000);
+  const ready = window.EJS_ready;
+  window.EJS_ready = () => {
+    stage = 'Inicio de ' + player.game.name;
+    message('Iniciando ' + player.game.name + '…');
+    ready();
+  };
   window.EJS_onGameStart = () => {
+    clearTimeout(startupTimer);
     const manager = window.EJS_emulator?.gameManager;
     manager?.functions?.setVariable('pcsx_rearmed_multitap', 'port 1'); manager?.setVSync(false);
     $('#start').hidden = true;
@@ -169,17 +214,17 @@ $('#start').onclick = () => {
     void connect();
   };
   $('#game').replaceChildren(); const script = document.createElement('script'); script.src = `${base}/media/loader.js`;
-  script.onerror = () => { started = false; $('#start').disabled = false; message('No se pudo cargar el emulador. Revisá la conexión.'); };
-  document.body.append(script); message('Cargando emulador y juego… La primera carga puede demorar.');
+  script.onerror = () => { clearTimeout(startupTimer); retryEngine(); message('No se pudo cargar el emulador. Podés reintentar en esta sala.'); };
+  document.body.append(script); message('Preparando el emulador de ' + player.game.name + '…');
 };
 $('#share').onclick = () => share(); $('#tab-share').onclick = () => share(true);
 $('#sound').onclick = async () => { const video = $('#remote-video'); if (!video) return; video.muted = false; try { await video.play(); $('#sound').textContent = 'Sonido activado'; } catch { video.muted = true; message('Volvé a pulsar Activar sonido.'); } };
 $('#reconnect').onclick = async () => {
-  if (!player?.seat || stopped) return;
+  if (!player?.seat || stopped || $('#reconnect').disabled) return;
   $('#reconnect').disabled = true;
-  try { mask = 0; transmit(); clearTimeout(pollTimer); drop(0); await api('resume'); ack = 0; void poll(); message('Reconectando tu jugador…'); }
+  try { mask = 0; transmit(); await pendingPoll; clearTimeout(pollTimer); drop(0); await api('resume'); ack = 0; void poll(); message('Reconectando tu jugador…'); }
   catch (error) { fail(error); }
-  finally { $('#reconnect').disabled = false; }
+  finally { if (!stopped && !pendingPoll) { clearTimeout(pollTimer); void poll(); } $('#reconnect').disabled = false; }
 };
 function transmit() {
   const channel = peers.get(0)?.channel;
@@ -191,23 +236,68 @@ let mobile;
 try { mobile = setupMobilePlayer(next => controls.setTouchMask(next)); }
 catch (error) { console.error('No se pudo preparar la interfaz móvil:', error); }
 const inputTimer = setInterval(transmit, 50);
-const pingTimer = setInterval(() => { const channel = peers.get(0)?.channel; if (!stopped && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'ping', at: performance.now(), profile: quality.value })); }, 2000);
+const pingTimer = setInterval(() => { const channel = peers.get(0)?.channel; if (!stopped && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'ping', at: performance.now(), profile: quality.value, fps: peers.get(0)?.localFps })); }, 2000);
 const heartbeat = setInterval(() => { if (player && !stopped) void api('heartbeat').catch(fail); }, 10000);
 let statsBusy = false;
 const statsTimer = setInterval(async () => {
-  const entry = peers.get(0); if (statsBusy || !entry || stopped || entry.pc.connectionState !== 'connected') return;
+  if (statsBusy || stopped) return;
   statsBusy = true;
-  try { const stats = summarizeStats(await entry.pc.getStats(), entry.statsPrevious); entry.statsPrevious = stats.next; $('#metrics').textContent = formatMetrics(stats.metrics); } catch { /* Statistics do not interrupt a match. */ }
+  try {
+    const lines = [];
+    const host = player?.seat === 0;
+    const format = value => Number.isFinite(value) ? Math.round(value) + ' FPS' : 'Sin datos';
+    for (const [seat, entry] of peers) {
+      if (entry.pc.connectionState !== 'connected') continue;
+      const report = await entry.pc.getStats();
+      const type = host ? 'outbound-rtp' : 'inbound-rtp';
+      const video = [...report.values()].find(item => item.kind === 'video' && item.type === type);
+      const frames = host ? video?.framesSent : video?.framesDecoded;
+      const old = entry.frameSample;
+      entry.localFps = undefined;
+      if (video && Number.isFinite(frames)) {
+        if (old?.id === video.id && video.timestamp > old.time && frames >= old.frames) {
+          entry.localFps = 1000 * (frames - old.frames) / (video.timestamp - old.time);
+        }
+        entry.frameSample = { id: video.id, frames, time: video.timestamp };
+      }
+      lines.push(`Jugador ${(host ? seat : player.seat) + 1} · Enviados por anfitrión: ${format(host ? entry.localFps : entry.remoteFps)} · Decodificados por invitado: ${format(host ? entry.remoteFps : entry.localFps)}`);
+      if (!host) {
+        const stats = summarizeStats(report, entry.statsPrevious);
+        entry.statsPrevious = stats.next;
+        lines.push(formatMetrics(stats.metrics));
+      }
+    }
+    $('#metrics').textContent = lines.join('\n') || 'Sin datos';
+  } catch { /* Statistics are optional. */ }
   finally { statsBusy = false; }
 }, 2000);
-window.addEventListener('pagehide', () => { mobile?.dispose(); controls.dispose(); mask = 0; transmit(); stop(); for (const timer of [inputTimer, pingTimer, heartbeat, statsTimer]) clearInterval(timer); });
+$('#diagnose').onclick = () => $('#diagnostics').showModal();
+function offerReconnect() {
+  if (!document.hidden && player?.seat > 0 && !stopped && peers.get(0)?.pc.connectionState !== 'connected') {
+    $('#reconnect').hidden = false;
+  }
+}
+window.addEventListener('online', offerReconnect);
+document.addEventListener('visibilitychange', offerReconnect);
+window.addEventListener('pageshow', event => { if (event.persisted) offerReconnect(); });
+window.addEventListener('pagehide', event => { if (event.persisted) return; mobile?.dispose(); controls.dispose(); mask = 0; transmit(); stop(); for (const timer of [inputTimer, pingTimer, heartbeat, statsTimer]) clearInterval(timer); });
 try {
   const response = await fetch(`${base}/player`, { cache: 'no-store', credentials: 'same-origin' });
   player = await response.json(); if (!response.ok) throw new Error(player.error || 'No tenés acceso a esta partida.');
   document.querySelector('.controls strong').textContent = player.game.name;
   document.title = player.game.name + ' · NSM';
   $('#seat').textContent = `Jugador ${player.seat + 1}`;
-  $('#instructions').textContent = player.seat === 0 ? 'Elegí varios jugadores dentro del juego. Mantené esta pestaña abierta. Las partidas guardadas quedan en este navegador.' : 'Hacé clic en la imagen para controlar. WASD: mover. Numpad 4/8/6/2: □/△/○/×. Enter: Start. Se recomienda PC con teclado.';
-  if (player.seat === 0) { await api('host-reset'); $('#start').hidden = false; message('Pulsá Jugar. Tus amigos se conectan automáticamente.'); }
+  $('#instructions').textContent = player.seat === 0 ? 'Este dispositivo descarga y ejecuta el juego. Mantené esta pestaña abierta. El progreso queda en este navegador.' : 'El anfitrión ejecuta el juego. En celular, usá el joystick táctil. Con teclado: WASD para mover y Enter para Start.';
+  if (player.seat === 0) {
+    await api('host-reset');
+    $('#start').hidden = false;
+    message('Pulsá Jugar para cargar el juego en este dispositivo.');
+    {
+      void fetch(`${base}/media/game.chd`, { method: 'HEAD' }).then(response => {
+        const size = Number(response.headers.get('Content-Length'));
+        if (response.ok && size && !started && !stopped) message(`Este dispositivo alojará ${player.game.name}. Descarga: ${Math.round(size / 1000000)} MB.`);
+      }).catch(() => {});
+    }
+  }
   else { $('#reconnect').hidden = false; await api('resume'); message('Esperando imagen del anfitrión…'); void poll(); }
 } catch (error) { message(error.message); stop(); }
