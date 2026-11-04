@@ -379,3 +379,18 @@ body{font-size:13px;line-height:1.4}.titlebar{min-height:25px;padding:2px 4px;ba
 .welcome-copy h2{font:bold 34px/1.15 Tahoma,Arial,sans-serif;letter-spacing:-1px}.welcome-copy>p{font-size:14px;line-height:1.6}.auth-brand h1{font-size:28px}.auth-content{padding:20px 22px 0}.desktop-watermark{opacity:.5}.identity-panel{padding-top:16px;padding-bottom:16px}.chat-peer{padding-top:9px;padding-bottom:9px}
 @media(max-width:600px){.game-card{grid-template-columns:42px 1fr;gap:8px;padding:9px 6px}.game-cover,.game-cover.racing{width:38px;height:38px;font-size:10px}.game-card-body{flex-wrap:wrap;gap:8px}.game-card button{margin-left:0;min-height:36px}.games-catalog{padding:10px}.games-intro h2{font-size:14px}.menu-hint{display:none}}
 @media(pointer:coarse){.classic-menu>summary,.window-menubar .menu-button{min-height:36px;padding-top:8px;padding-bottom:8px}.classic-menu-items>button{min-height:40px}}
+/* Always expose rooms on touch screens; compact the desktop shortcuts. */
+.create-room-shortcut{margin-left:auto;font-weight:bold;white-space:nowrap}.create-room-shortcut>span{color:#0a246a;margin-right:4px}
+.logged-in .desktop-topline{display:none}
+@media(min-width:901px){
+ .logged-in .desktop-icons{left:8px;top:7px;width:auto;flex-direction:row;gap:5px}
+ .logged-in .desktop-icons>button{flex-direction:row;gap:6px;padding:3px 10px;min-height:30px;border:1px solid #ffffff50;background:#006f6f}
+ .desktop-icons .desktop-logo,.desktop-icons .desktop-logo .messenger-mark{width:21px;height:21px;flex-basis:21px;transform:none}
+ .desktop-icons .pixel-game{font-size:24px;width:24px;height:24px;line-height:24px}
+ nsm-friends{left:8px;top:46px;height:calc(100% - 54px)}
+ nsm-games{left:350px;top:46px;right:8px;bottom:8px}
+}
+@media(max-width:900px){
+ .window-menubar .create-room-shortcut{min-height:40px;padding:7px 10px}
+ .task-buttons>.game-task{flex:0 0 74px;min-width:74px;max-width:74px}
+}

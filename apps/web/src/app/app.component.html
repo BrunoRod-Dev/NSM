@@ -22,7 +22,7 @@
   <button class="start-button" type="button" [attr.aria-expanded]="startOpen()" (click)="startOpen.set(!startOpen())"><span class="tiny-logo" aria-hidden="true"></span>Inicio</button><div class="task-divider"></div>
   <div class="task-buttons">
     <button type="button" class="main-task" [class.pressed]="friendsForeground() && session.user()" (click)="showFriends()"><span class="tiny-logo" aria-hidden="true"></span>{{ compact() ? 'Amigos' : 'NSM Messenger' }}</button>
-    @if (games.visible()) { <button type="button" class="game-task" [class.pressed]="gamesForeground()" (click)="games.open()">{{ games.activeRoom()?.game?.name ?? 'Juegos' }}</button> }
+    @if (session.user()) { <button type="button" class="game-task" [class.pressed]="games.visible() && gamesForeground()" (click)="games.open()">Juegos</button> }
     @for (window of taskWindows(); track window.id) { <button type="button" class="chat-task" [title]="conversation(window.id)?.peer?.displayName ?? ''" [class.pressed]="active() === window.id && !window.minimized" (click)="focus(window.id, true)">{{ conversation(window.id)?.peer?.displayName }} @if (store.unread()[window.id]) { <b>({{ store.unread()[window.id] }})</b> }</button> }
   </div>
   <div class="system-tray"><span class="status-dot" [class.offline]="!session.user() || store.connection() !== 'online'" aria-hidden="true"></span><span class="tray-label">{{ session.user() ? 'NSM' : 'Sin conectar' }}</span><time>{{ now() | date:'HH:mm' }}</time></div>

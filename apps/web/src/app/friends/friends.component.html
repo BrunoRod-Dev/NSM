@@ -1,6 +1,6 @@
 <section class="window friends-window" aria-label="Amigos de NSM">
   <div class="titlebar"><span class="tiny-logo" aria-hidden="true"></span><span>NSM Messenger</span><span class="title-decoration" aria-hidden="true">▢</span></div>
-  <nav class="window-menubar" aria-label="Menú de NSM"><details #accountMenu class="classic-menu"><summary>Archivo</summary><div class="classic-menu-items"><button type="button" (click)="editName(); accountMenu.open=false">Cambiar nombre…</button><hr><button type="button" (click)="logout(); accountMenu.open=false">Cerrar sesión</button></div></details><span class="menu-hint">Amigos y conversaciones</span></nav>
+  <nav class="window-menubar" aria-label="Menú de NSM"><details #accountMenu class="classic-menu"><summary>Archivo</summary><div class="classic-menu-items"><button type="button" (click)="editName(); accountMenu.open=false">Cambiar nombre…</button><hr><button type="button" (click)="logout(); accountMenu.open=false">Cerrar sesión</button></div></details><button type="button" class="menu-button create-room-shortcut" (click)="games.open()"><span aria-hidden="true">✚</span> Crear sala</button></nav>
   <header class="identity-panel">
     <span class="avatar self" aria-hidden="true">{{ session.user()?.displayName?.slice(0, 1)?.toUpperCase() }}</span>
     <div><strong>{{ session.user()?.displayName }}</strong><small>{{ '@' + session.user()?.username }}</small><span class="connection-label"><i class="status-dot" [class.offline]="store.connection() !== 'online'"></i>{{ connectionLabel() }}</span></div>

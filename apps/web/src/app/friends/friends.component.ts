@@ -3,11 +3,13 @@ import { FormsModule } from '@angular/forms';
 import type { User } from '../../../../../packages/contracts/src/index';
 import { MessengerService } from '../messenger/messenger.service';
 import { SessionService } from '../accounts/session.service';
+import { GamesService } from '../games/games.service';
 
 @Component({ selector: 'nsm-friends', imports: [FormsModule], templateUrl: './friends.component.html' })
 export class FriendsComponent {
   readonly store = inject(MessengerService);
   readonly session = inject(SessionService);
+  readonly games = inject(GamesService);
   readonly openPeer = output<string>();
   readonly tab = signal<'friends' | 'requests' | 'history'>('friends');
   readonly editing = signal(false);
