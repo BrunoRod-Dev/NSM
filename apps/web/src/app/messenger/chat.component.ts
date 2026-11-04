@@ -20,7 +20,8 @@ export class ChatComponent {
   readonly minimize = output<void>();
   readonly closeWindow = output<void>();
   readonly moved = output<{ dx: number; dy: number }>();
-  readonly draft = signal('');
+  readonly draft = computed(() => this.store.drafts()[this.conversation().id] ?? '');
+  setDraft(value: string) { this.store.drafts.update(all => ({ ...all, [this.conversation().id]: value })); }
   readonly peerOnline = computed(() => this.store.social().friends.find(friend => friend.id === this.conversation().peer.id)?.online ?? false);
   readonly connectionLabel = computed(() => ({ online: 'Conexión establecida', connecting: 'Conectando…', offline: 'Sin conexión · reconectando…' })[this.store.connection()]);
   @ViewChild('transcript') transcript?: ElementRef<HTMLElement>;
@@ -46,7 +47,7 @@ export class ChatComponent {
   send() {
     const text = this.draft().trim();
     if (!text || !this.conversation().canSend) return;
-    this.draft.set('');
+    this.setDraft('');
     void this.store.send(this.conversation().id, text);
     setTimeout(() => { const el = this.transcript?.nativeElement; if (el) el.scrollTop = el.scrollHeight; });
   }

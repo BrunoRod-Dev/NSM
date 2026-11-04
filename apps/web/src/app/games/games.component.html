@@ -16,7 +16,7 @@
   </nav>
   @if(games.error()) { <p class="error game-error" role="alert">{{games.error()}}</p> }
   @if(games.activeRoom(); as room) {
-    <div class="game-roster" aria-label="Jugadores">@for(player of room.players; track player.user.id) { <span>J{{player.seat+1}} · {{player.user.displayName}}{{player.seat===0 ? ' (anfitrión)' : ''}}</span> }<span class="muted">{{room.ready ? 'En partida' : 'Esperando inicio'}}</span></div>
+    <div class="game-roster" aria-label="Jugadores">@for(player of room.players; track player.user.id) { <span>J{{player.seat+1}} · {{player.user.displayName}}{{player.seat===0 ? ' (anfitrión)' : ''}} @if(player.reservedMinutes) { · Esperando reconexión ({{player.reservedMinutes}} min) }</span> }<span class="muted">{{room.ready ? 'En partida' : 'Esperando inicio'}}</span></div>
     @if(frame(); as url) { <iframe class="game-frame" [title]="'Partida de ' + room.game.name" [src]="url" allow="autoplay; fullscreen; gamepad; display-capture"></iframe> }
   } @else {
     <div class="games-catalog"><div class="games-intro"><div><h2>Biblioteca de juegos</h2><p>Elegí un juego y creá una sala para tus amigos.</p></div></div>

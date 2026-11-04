@@ -13,6 +13,7 @@ const envSchema = z.object({
   CRASH_SBI_PATH: z.string().optional(),
   CTR_GAME_PATH: z.string().optional(),
   CTR_SBI_PATH: z.string().optional(),
+  TURN_SHARED_SECRET: z.string().optional(),
   RTC_ICE_SERVERS: z.string().max(12000).optional(),
 });
 export type Config = z.infer<typeof envSchema>;

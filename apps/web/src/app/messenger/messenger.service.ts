@@ -25,6 +25,7 @@ export class MessengerService {
   readonly hasOlder = signal<Record<string, boolean>>({});
   readonly loading = signal<Record<string, boolean>>({});
   readonly error = signal('');
+  readonly drafts = signal<Record<string, string>>({});
   readonly unread = signal<Record<string, number>>({});
   activeConversation: string | null = null;
   start() {
@@ -45,6 +46,9 @@ export class MessengerService {
     socket.on('connect_error', () => { this.connection.set('offline'); void this.checkSession(); });
     socket.on('session:expired', () => this.session.clear('Tu sesión terminó. Volvé a conectar.'));
     socket.on('social:changed', () => void this.refresh());
+    socket.on('games:signal', () => {
+      document.querySelector<HTMLIFrameElement>('iframe.game-frame')?.contentWindow?.postMessage('nsm:signal', location.origin);
+    });
     socket.on('games:changed', () => void this.games.refresh());
     socket.on('conversations:changed', () => void this.refresh());
     socket.on('presence:changed', () => void this.refresh());
@@ -66,6 +70,7 @@ export class MessengerService {
     this.socket = undefined;
     this.cursors.clear();
     this.catchups.clear();
+    this.drafts.set({});
     this.refreshRunning = false;
     this.refreshAgain = false;
     this.social.set({ friends: [], incoming: [], outgoing: [], blocked: [] });

@@ -17,7 +17,9 @@ const roomId = location.pathname.split('/')[4];
 const base = `/api/games/rooms/${roomId}`;
 const clientId = crypto.randomUUID();
 const peers = new Map();
+let bootStatus = 'Sin iniciar';
 const message = text => { $('#status').textContent = text; };
+const bootMessage = text => { bootStatus = text; message(text); };
 const quality = $('#stream-quality');
 quality.value = isAppleMobile() || matchMedia('(pointer: coarse)').matches ? 'smooth' : 'balanced';
 try { const saved = localStorage.getItem('nsm.stream.profile'); if (validProfile(saved)) quality.value = saved; } catch {}
@@ -127,7 +129,12 @@ async function receive(event) {
     if (entry.pc.remoteDescription) await entry.pc.addIceCandidate(event.candidate); else entry.pending.push(event.candidate);
   }
 }
-let pendingPoll;
+let pendingPoll, signalWaiting = false;
+window.addEventListener('message', event => {
+  if (event.origin !== location.origin || event.source !== parent || event.data !== 'nsm:signal' || !player || stopped) return;
+  if (pendingPoll) signalWaiting = true;
+  else { clearTimeout(pollTimer); void poll(); }
+});
 function poll() {
   if (!pendingPoll) pendingPoll = pollOnce().finally(() => { pendingPoll = undefined; });
   return pendingPoll;
@@ -140,7 +147,8 @@ async function pollOnce() {
     if (player.seat > 0 && !data.ready) message(`${player.host.displayName} está preparando el juego. Entrás sin descargar el disco.`);
     for (const event of data.events) { if (stopped) return; await receive(event); ack = event.eventId; }
   } catch (error) { fail(error); }
-  if (!stopped) pollTimer = setTimeout(poll, 500);
+  if (!stopped) pollTimer = setTimeout(poll, signalWaiting ? 0 : 5000);
+  signalWaiting = false;
 }
 async function share(useTabAudio = false) {
   if (sharing) return;
@@ -165,16 +173,16 @@ $('#start').onclick = async () => {
   started = true; $('#start').disabled = true;
   configureGame({ base, player });
   if (isAppleMobile()) {
-    message('Consultando el disco de ' + player.game.name + '…');
+    bootMessage('Consultando el disco de ' + player.game.name + '…');
     prepareDisc ??= mobileDisc(window.EJS_gameUrl, player.gameId, player.host.id);
     try {
-      window.EJS_gameUrl = await prepareDisc((done, total) => message(`Descargando ${player.game.name}: ${done} de ${total} MB.`));
+      window.EJS_gameUrl = await prepareDisc((done, total) => bootMessage(`Descargando ${player.game.name}: ${done} de ${total} MB.`));
       prepareDisc = null;
     } catch (error) {
       started = false;
       $('#start').disabled = false;
       $('#start').textContent = 'Reintentar descarga';
-      message('Descarga del disco: ' + (error instanceof TypeError ? 'conexión interrumpida.' : error.message) + ' Podés reintentar en esta sala.');
+      bootMessage('Descarga del disco: ' + (error instanceof TypeError ? 'conexión interrumpida.' : error.message) + ' Podés reintentar en esta sala.');
       return;
     }
   }
@@ -183,18 +191,18 @@ $('#start').onclick = async () => {
     $('#start').disabled = false;
     $('#start').textContent = 'Reintentar inicio';
     $('#start').onclick = () => location.reload();
-    message(stage + ' está demorando. Podés esperar, reintentar o pedirle a un amigo que cree la sala y te invite.');
+    bootMessage(stage + ' está demorando. Podés esperar, reintentar o pedirle a un amigo que cree la sala y te invite.');
   };
   window.addEventListener('nsm:boot-error', event => {
     clearTimeout(startupTimer);
     retryEngine();
-    message(event.detail + ' Reintentá o pedile a un amigo que cree la sala y te invite.');
+    bootMessage(event.detail + ' Reintentá o pedile a un amigo que cree la sala y te invite.');
   }, { once: true });
   startupTimer = setTimeout(retryEngine, 120000);
   const ready = window.EJS_ready;
   window.EJS_ready = () => {
     stage = 'Inicio de ' + player.game.name;
-    message('Iniciando ' + player.game.name + '…');
+    bootMessage('Iniciando ' + player.game.name + '…');
     ready();
   };
   window.EJS_onGameStart = () => {
@@ -202,20 +210,22 @@ $('#start').onclick = async () => {
     const manager = window.EJS_emulator?.gameManager;
     manager?.functions?.setVariable('pcsx_rearmed_multitap', 'port 1'); manager?.setVSync(false);
     $('#start').hidden = true;
+    $('#save-export').hidden = false;
+    $('#save-import').hidden = false;
     $('#game').focus();
-    message('Juego iniciado. Conectando a tus amigos…');
+    bootMessage('Juego iniciado. Conectando a tus amigos…');
     let attempts = 0;
     const connect = async () => {
       if (stopped || sharing) return;
       await share();
       if (!sharing && ++attempts < 20) setTimeout(connect, 1000);
-      else if (!sharing) { $('#share').hidden = false; $('#tab-share').hidden = false; message('Abrí Controles → Conexión para reintentar compartir.'); }
+      else if (!sharing) { $('#share').hidden = false; $('#tab-share').hidden = false; bootMessage('Abrí Controles → Conexión para reintentar compartir.'); }
     };
     void connect();
   };
   $('#game').replaceChildren(); const script = document.createElement('script'); script.src = `${base}/media/loader.js`;
-  script.onerror = () => { clearTimeout(startupTimer); retryEngine(); message('No se pudo cargar el emulador. Podés reintentar en esta sala.'); };
-  document.body.append(script); message('Preparando el emulador de ' + player.game.name + '…');
+  script.onerror = () => { clearTimeout(startupTimer); retryEngine(); bootMessage('No se pudo cargar el emulador. Podés reintentar en esta sala.'); };
+  document.body.append(script); bootMessage('Preparando el emulador de ' + player.game.name + '…');
 };
 $('#share').onclick = () => share(); $('#tab-share').onclick = () => share(true);
 $('#sound').onclick = async () => { const video = $('#remote-video'); if (!video) return; video.muted = false; try { await video.play(); $('#sound').textContent = 'Sonido activado'; } catch { video.muted = true; message('Volvé a pulsar Activar sonido.'); } };
@@ -271,6 +281,39 @@ const statsTimer = setInterval(async () => {
   } catch { /* Statistics are optional. */ }
   finally { statsBusy = false; }
 }, 2000);
+// Memory card backups are local to the host and tagged with the game ID.
+$('#save-export').onclick = () => {
+  try {
+    const bytes = window.EJS_emulator.gameManager.getSaveFile();
+    if (!bytes?.length) return message('Primero guardá el progreso dentro del juego.');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([bytes]));
+    link.download = player.gameId + '.sav';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 60000);
+  } catch { message('No se pudo exportar el guardado.'); }
+};
+$('#save-import').onclick = () => $('#save-file').click();
+$('#save-file').onchange = async event => {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  try {
+    const manager = window.EJS_emulator.gameManager;
+    const current = manager.getSaveFile();
+    const matchingName = file.name === player.gameId + '.sav' || file.name.startsWith(player.gameId + ' (') && file.name.endsWith(').sav');
+    if (!matchingName || !current?.length || file.size !== current.length) return message('Elegí un guardado de NSM para este juego.');
+    if (!confirm('¿Reemplazar la tarjeta de memoria de este juego con el guardado elegido?')) return;
+    manager.FS.writeFile(manager.getSaveFilePath(), new Uint8Array(await file.arrayBuffer()));
+    manager.loadSaveFiles();
+    message('Guardado importado. Cargalo desde el menú del juego.');
+  } catch { message('No se pudo importar el guardado.'); }
+};
+$('#copy-diagnostics').onclick = async () => {
+  const summary = [player?.game.name, player?.seat === 0 ? 'Anfitrión' : 'Invitado', bootStatus, $('#metrics').textContent].join('\n');
+  try { await navigator.clipboard.writeText(summary); $('#diagnostic-copy').textContent = 'Copiado'; }
+  catch { $('#diagnostic-copy').textContent = summary; }
+};
 $('#diagnose').onclick = () => $('#diagnostics').showModal();
 function offerReconnect() {
   if (!document.hidden && player?.seat > 0 && !stopped && peers.get(0)?.pc.connectionState !== 'connected') {

@@ -57,7 +57,7 @@ export async function createApp(config: Config, opts: { logger?: boolean } = {})
     allowRequest: (req, cb) => cb(null, req.headers.origin === config.APP_ORIGIN),
   });
   const presence = new PresenceService(friends, (id, event) => io.to(`user:${id}`).emit('presence:changed', event), () => app.log.error('No se pudo actualizar la presencia'));
-  const games = new GamesService(db, config, ids => { for (const id of ids) io.to(`user:${id}`).emit('games:changed'); });
+  const games = new GamesService(db, config, ids => { for (const id of ids) io.to(`user:${id}`).emit('games:changed'); }, id => io.to(`user:${id}`).emit('games:signal'));
   const gameCleanup = setInterval(() => games.sweep(), 5000);
   gameCleanup.unref();
   function changed(...ids: string[]) {

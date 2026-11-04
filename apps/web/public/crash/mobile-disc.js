@@ -30,7 +30,23 @@ export function mobileDisc(url, gameId, ownerId) {
         await response.body?.cancel();
         throw new Error('No se pudo continuar la descarga.');
       }
-      const part = await response.blob();
+      const reader = response.body?.getReader();
+      const pieces = [];
+      let received = 0;
+      let shown = mb(offset);
+      if (reader) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            pieces.push(value);
+            received += value.byteLength;
+            const current = mb(offset + received);
+            if (current !== shown) { report(current, mb(total)); shown = current; }
+          }
+        } finally { reader.releaseLock(); }
+      }
+      const part = reader ? new Blob(pieces) : await response.blob();
       if (part.size !== end - offset + 1) throw new Error('La descarga se interrumpió.');
       parts.push(part);
       offset += part.size;

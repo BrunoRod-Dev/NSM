@@ -29,6 +29,7 @@ services:
       CRASH_SBI_PATH: /games/crash-bash.sbi
       CTR_GAME_PATH: /games/ctr.chd
       CTR_SBI_PATH: /games/ctr.sbi
+      TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:-}
       RTC_ICE_SERVERS: ${RTC_ICE_SERVERS:-}
     volumes:
       - ${NSM_GAMES_DIR:?Set NSM_GAMES_DIR}:/games:ro

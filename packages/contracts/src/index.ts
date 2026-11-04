@@ -19,6 +19,7 @@ export interface MessagePage { messages: Message[]; hasMore: boolean }
 export interface ErrorBody { error: string; code?: string }
 export type SendResult = { ok: true; message: Message } | { ok: false; error: string; code?: string };
 export interface ServerEvents {
+  'games:signal': () => void;
   'games:changed': () => void;
   'social:changed': () => void;
   'conversations:changed': () => void;
@@ -34,7 +35,7 @@ export const gameDefinitions: readonly GameDefinition[] = [
   { id: 'crash-team-racing', name: 'Crash Team Racing', maxPlayers: 4, enabled: true, adapter: 'emulatorjs-psx' },
 ];
 export interface CatalogGame extends GameDefinition { available: boolean }
-export interface GamePlayer { user: User; seat: number }
+export interface GamePlayer { user: User; seat: number; reservedMinutes?: number }
 export interface GameRoom { id: string; gameId: string; game: GameDefinition; host: User; players: GamePlayer[]; ready: boolean; createdAt: string }
 export interface GameInvitation { id: string; gameId: string; game: GameDefinition; roomId: string; from: User; to: User; expiresAt: string }
 export interface GamesState {

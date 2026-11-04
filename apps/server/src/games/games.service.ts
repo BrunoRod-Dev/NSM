@@ -1,5 +1,5 @@
 import { GameCatalog } from './game-catalog.js';
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { GameInvitation, GameRoom, GamesState, User } from '../../../../packages/contracts/src/index.js';
 import { Database, lockPair } from '../db.js';
@@ -25,7 +25,7 @@ export class GamesService {
   private invitations = new Map<string, GameInvitation>();
   private notify: (ids: string[]) => void;
   readonly iceServers: z.infer<typeof iceSchema>;
-  constructor(private db: Database, private config: Config, notify: (ids: string[]) => void = () => {}) {
+  constructor(private db: Database, private config: Config, notify: (ids: string[]) => void = () => {}, private signalPending: (id: string) => void = () => {}) {
     this.catalog = new GameCatalog(config);
     this.notify = notify;
     this.iceServers = iceSchema.parse(config.RTC_ICE_SERVERS ? JSON.parse(config.RTC_ICE_SERVERS) : [{ urls: 'stun:stun.l.google.com:19302' }]);
@@ -38,8 +38,9 @@ export class GamesService {
   private enqueue(member: Member, event: Omit<Event, 'eventId'>) {
     if (member.queue.length >= 100) throw new AppError(429, 'Esperá a que el otro jugador reconecte.', 'GAME_QUEUE_FULL');
     member.queue.push({ ...event, eventId: ++member.sequence });
+    this.signalPending(member.user.id);
   }
-  private view(room: Room): GameRoom { return { id: room.id, gameId: room.gameId, game: this.catalog.definition(room.gameId), host: room.host, ready: room.ready, players: [...room.members.values()].map(m => ({ user: m.user, seat: m.seat })), createdAt: new Date(room.created).toISOString() }; }
+  private view(room: Room): GameRoom { return { id: room.id, gameId: room.gameId, game: this.catalog.definition(room.gameId), host: room.host, ready: room.ready, players: [...room.members.values()].map(m => ({ user: m.user, seat: m.seat, reservedMinutes: Date.now() - m.seen > 30000 ? Math.max(1, Math.ceil((m.seen + 300000 - Date.now()) / 60000)) : undefined })), createdAt: new Date(room.created).toISOString() }; }
   async files(gameId = 'crash-bash') { return this.catalog.files(gameId); }
   async state(user: User): Promise<GamesState> {
     this.sweep();
@@ -126,7 +127,14 @@ export class GamesService {
   }
   async player(user: User, roomId: string) {
     const { room, member } = await this.authorize(user, roomId);
-    return { ...this.view(room), seat: member.seat, hasSbi: member.seat === 0 && !!(await this.files(room.gameId))?.sbi, iceServers: this.iceServers };
+    const secret = this.config.TURN_SHARED_SECRET;
+    const username = Math.floor(Date.now() / 1000 + 12 * 3600) + ':' + user.id;
+    const iceServers = this.iceServers.map(server => {
+      const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+      if (!secret || !urls.some(url => /^turns?:/.test(url))) return server;
+      return { urls: server.urls, username, credential: createHmac('sha1', secret).update(username).digest('base64') };
+    });
+    return { ...this.view(room), seat: member.seat, hasSbi: member.seat === 0 && !!(await this.files(room.gameId))?.sbi, iceServers };
   }
   async engine(user: User, roomId: string, action: string, body: Record<string, unknown>) {
     const { room, member } = await this.authorize(user, roomId);
@@ -178,14 +186,14 @@ export class GamesService {
   }
   revokeContact(a: string, b: string) {
     for (const [id, invitation] of this.invitations) if ([invitation.from.id, invitation.to.id].includes(a) && [invitation.from.id, invitation.to.id].includes(b)) { this.invitations.delete(id); this.notify([a, b]); }
-    for (const room of [...this.rooms.values()]) if (room.members.has(a) && room.members.has(b)) this.leave(room.host.id, room.id);
+    for (const room of [...this.rooms.values()]) if (room.members.has(a) && room.members.has(b)) this.leave(room.host.id === b ? a : b, room.id);
   }
   sweep() {
     const now = Date.now();
     for (const [id, invitation] of this.invitations) if (Date.parse(invitation.expiresAt) <= now) { this.invitations.delete(id); this.notify([invitation.from.id, invitation.to.id]); }
     for (const room of [...this.rooms.values()]) {
-      if (now - room.members.get(room.host.id)!.seen > 90000 || now - room.created > 4 * 3600000) { this.leave(room.host.id, room.id); continue; }
-      for (const member of [...room.members.values()]) if (member.seat && now - member.seen > 45000) this.leave(member.user.id, room.id);
+      if (now - room.members.get(room.host.id)!.seen > 300000) { this.leave(room.host.id, room.id); continue; }
+      for (const member of [...room.members.values()]) if (member.seat && now - member.seen > 300000) this.leave(member.user.id, room.id);
     }
   }
   close() { this.rooms.clear(); this.invitations.clear(); }

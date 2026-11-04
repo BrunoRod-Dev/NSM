@@ -2,6 +2,7 @@ node_modules
 .git
 .env
 .env.*
+production.env
 .local
 dist
 .angular
