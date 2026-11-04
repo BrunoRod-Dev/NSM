@@ -23,12 +23,12 @@
       <p class="muted">Las descargas ocupan espacio en este dispositivo. Si el navegador las elimina, podés recuperarlas. Borrar un juego conserva sus guardados.</p>@if(library.notice()) { <p role="status">{{library.notice()}}</p> }@for(platform of consoles; track platform.id) { @if(consoleGames(platform.id).length) { <h3>{{platform.name}}</h3><p class="muted">{{platform.help}}</p><div class="game-cards">@for(game of consoleGames(platform.id); track game.id) {
         <article class="game-card"><div class="game-cover" [class.racing]="game.id==='crash-team-racing'" aria-hidden="true">{{game.adapter==='emulatorjs-neogeo' ? 'METAL SLUG' : game.id==='crash-team-racing' ? 'CTR' : 'BASH'}}</div><div class="game-card-body"><div><h3>{{game.name}}</h3><p>Hasta {{game.maxPlayers}} jugadores · Teclado, mando o táctil</p><small>{{game.available ? (library.entries()[game.id]?.label ?? 'Consultando…') : 'Archivos pendientes'}}</small>
 @if(library.entries()[game.id]; as entry) {
-<p>{{ (entry.size / 1000000).toFixed(0) }} MB en este dispositivo</p>
-@if(entry.busy) { <progress [value]="entry.progress" max="100" aria-label="Descarga del juego"></progress> }
+@if(entry.size > 0) { <p>Tamaño del juego · {{ (entry.size / 1000000).toFixed(0) }} MB</p> }
+@if(entry.downloading) { <progress [value]="entry.progress" max="100" aria-label="Descarga del juego"></progress> }
 }
 </div><div class="button-row">
 @if(library.entries()[game.id]?.busy) {
-<button type="button" (click)="library.pause(game.id)">Pausar descarga</button>
+@if(library.entries()[game.id]?.downloading) { <button type="button" (click)="library.pause(game.id)">Pausar descarga</button> }
 } @else {
 @if(library.entries()[game.id]?.ready) {
 <button type="button" [disabled]="games.busy()" (click)="library.create(game.id)">Crear sala</button>
