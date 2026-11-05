@@ -19,10 +19,25 @@ const base = `/api/games/rooms/${roomId}`;
 const clientId = crypto.randomUUID();
 const peers = new Map();
 let localRace = false, localBooted = false, localVersion, localChannel, closeRace;
+let attachedChannel;
+function raceDisconnected(channel, reason) {
+  if (localChannel !== channel || stopped) return;
+  bootMessage(reason);
+  if (player.seat > 0) $('#reconnect').hidden = false;
+}
 function attachRace(channel) {
+  if (!localBooted || channel !== localChannel || channel.readyState !== 'open' || attachedChannel === channel) return;
   closeRace?.();
+  attachedChannel = channel;
+  bootMessage(player.seat === 0 ? 'Conexión abierta. Esperando que el invitado prepare CTR…' : 'Conexión abierta. Solicitando el estado del anfitrión…');
+  closeRace = connectLocalRace(channel, player.seat === 0, () => mask, bootMessage, localVersion,
+    reason => raceDisconnected(channel, reason));
+}
+function watchRaceChannel(channel) {
   localChannel = channel;
-  closeRace = connectLocalRace(channel, player.seat === 0, () => mask, bootMessage, localVersion);
+  channel.onopen = () => attachRace(channel);
+  channel.onclose = () => raceDisconnected(channel, 'Se cerró la conexión de CTR. El jugador 2 puede pulsar Reconectar.');
+  attachRace(channel);
 }
 let bootStatus = 'Sin iniciar';
 const message = text => { $('#status').textContent = text; };
@@ -30,7 +45,7 @@ const bootMessage = text => { bootStatus = text; message(text); };
 const quality = $('#stream-quality');
 quality.value = isAppleMobile() || matchMedia('(pointer: coarse)').matches ? 'smooth' : 'balanced';
 try { const saved = localStorage.getItem('nsm.stream.profile'); if (validProfile(saved)) quality.value = saved; } catch {}
-const sendProfile = () => { const channel = peers.get(0)?.channel; if (channel?.readyState === 'open') channel.send(JSON.stringify({ type: 'quality', profile: quality.value })); };
+const sendProfile = () => { if (localRace) return; const channel = peers.get(0)?.channel; if (channel?.readyState === 'open') channel.send(JSON.stringify({ type: 'quality', profile: quality.value })); };
 quality.onchange = () => {
   try { localStorage.setItem('nsm.stream.profile', quality.value); } catch {}
   if (player?.seat === 0) for (const entry of peers.values()) void setVideoProfile(entry, quality.value, window.EJS_emulator?.canvas);
@@ -80,7 +95,7 @@ async function peer(seat, offer = false) {
       } else {
       const channel = pc.createDataChannel('ctr-local-v1');
       entry.channel = channel;
-      channel.onopen = () => attachRace(channel);
+      watchRaceChannel(channel);
       }
     } else {
     entry.input = new InputState((index, value) => window.EJS_emulator?.gameManager?.simulateInput(seat, index, value));
@@ -114,11 +129,11 @@ async function peer(seat, offer = false) {
       }
       if (event.channel.label === 'ctr-local-v1' && player.gameId === 'crash-team-racing' && player.seat === 1) {
         localRace = true;
-        localChannel = event.channel;
         $('#start').hidden = false;
         $('#start').textContent = 'Iniciar mi copia de CTR';
         bootMessage('Sala local de prueba. Iniciá tu copia instalada de CTR.');
-        if (localBooted) attachRace(localChannel);
+        watchRaceChannel(event.channel);
+        if (localBooted) $('#start').hidden = true;
         return;
       }
       entry.channel.onopen = sendProfile;
@@ -252,6 +267,10 @@ $('#start').onclick = async () => {
       if (player.seat === 0) {
         api('ready').then(() => { sharing = true; void poll(); }).catch(fail);
       } else if (localChannel?.readyState === 'open') attachRace(localChannel);
+      else if (localChannel?.readyState !== 'connecting') {
+        $('#reconnect').hidden = false;
+        $('#reconnect').click();
+      }
       return;
     }
     $('#save-export').hidden = false;
@@ -286,7 +305,7 @@ function transmit() {
   if (player?.seat > 0 && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'input', mask, sequence: sequence++ }));
 }
 const localInput = new InputState((index, value) => window.EJS_emulator?.gameManager?.simulateInput(0, index, value));
-const controls = setupControls(next => { mask = next; if (player?.seat === 0) localInput.update(mask); else transmit(); });
+const controls = setupControls(next => { mask = next; if (localRace) return; if (player?.seat === 0) localInput.update(mask); else transmit(); });
 let mobile;
 try { mobile = setupMobilePlayer(next => controls.setTouchMask(next)); }
 catch (error) { console.error('No se pudo preparar la interfaz móvil:', error); }
@@ -298,6 +317,10 @@ const statsTimer = setInterval(async () => {
   if (statsBusy || stopped) return;
   statsBusy = true;
   try {
+    if (localRace) {
+      $('#metrics').textContent = 'Carrera local · ' + (localChannel?.readyState ?? 'esperando conexión');
+      return;
+    }
     const lines = [];
     const host = player?.seat === 0;
     const format = value => Number.isFinite(value) ? Math.round(value) + ' FPS' : 'Sin datos';
