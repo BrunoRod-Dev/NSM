@@ -42,6 +42,7 @@ export const metalSlugDefinitions: readonly GameDefinition[] = [
 ];
 export const gameDefinitions: readonly GameDefinition[] = [
   ...metalSlugDefinitions,
+  { id: 'dragon-ball-final-bout', name: 'Dragon Ball: Final Bout', console: 'ps1', maxPlayers: 2, enabled: true, adapter: 'emulatorjs-psx' },
   { id: 'crash-bash', name: 'Crash Bash', console: 'ps1', maxPlayers: 4, enabled: true, adapter: 'emulatorjs-psx' },
   { id: 'crash-team-racing', name: 'Crash Team Racing', console: 'ps1', maxPlayers: 4, enabled: true, adapter: 'emulatorjs-psx' },
 ];

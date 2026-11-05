@@ -12,6 +12,7 @@ const envSchema = z.object({
   CRASH_PROJECT_DIR: z.string().optional(),
   CRASH_HOST_USERNAME: z.string().trim().toLowerCase().optional(),
   CRASH_SBI_PATH: z.string().optional(),
+  FINAL_BOUT_GAME_PATH: z.string().optional(),
   CTR_GAME_PATH: z.string().optional(),
   CTR_SBI_PATH: z.string().optional(),
   TURN_SHARED_SECRET: z.string().optional(),

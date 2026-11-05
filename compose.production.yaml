@@ -28,6 +28,7 @@ services:
       NEOGEO_PROJECT_DIR: /games/neogeo
       CRASH_PROJECT_DIR: /games/crash-bash
       CRASH_SBI_PATH: /games/crash-bash.sbi
+      FINAL_BOUT_GAME_PATH: /games/final-bout.chd
       CTR_GAME_PATH: /games/ctr.chd
       CTR_SBI_PATH: /games/ctr.sbi
       TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:-}

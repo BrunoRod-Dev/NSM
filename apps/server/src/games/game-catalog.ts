@@ -37,7 +37,7 @@ export class GameCatalog {
       } catch { return null; }
     }
     // Add a resolver for each newly supported title; configuration stays server-side.
-    if (!['crash-bash', 'crash-team-racing'].includes(id)) return null;
+    if (!['crash-bash', 'crash-team-racing', 'dragon-ball-final-bout'].includes(id)) return null;
     const dir = this.config.CRASH_PROJECT_DIR;
     if (!dir) return null;
     try {
@@ -45,7 +45,7 @@ export class GameCatalog {
       const bios = (await readdir(resolve(dir, 'archivos/bios'))).find(f => f.toLowerCase().endsWith('.bin'));
       const loader = resolve(dir, 'runtime/loader.js');
       if (!rom || !bios) return null;
-      const paths = { game: id === 'crash-team-racing' ? this.config.CTR_GAME_PATH : resolve(dir, 'archivos/juego', rom), bios: resolve(dir, 'archivos/bios', bios), loader, sbi: id === 'crash-team-racing' ? this.config.CTR_SBI_PATH : this.config.CRASH_SBI_PATH };
+      const paths = { game: id === 'dragon-ball-final-bout' ? this.config.FINAL_BOUT_GAME_PATH : id === 'crash-team-racing' ? this.config.CTR_GAME_PATH : resolve(dir, 'archivos/juego', rom), bios: resolve(dir, 'archivos/bios', bios), loader, sbi: id === 'dragon-ball-final-bout' ? undefined : id === 'crash-team-racing' ? this.config.CTR_SBI_PATH : this.config.CRASH_SBI_PATH };
       if (!paths.game || (id === 'crash-team-racing' && !paths.sbi)) return null;
       for (const path of Object.values(paths)) if (path && !(await stat(path)).isFile()) return null;
       return { ...paths, game: paths.game };

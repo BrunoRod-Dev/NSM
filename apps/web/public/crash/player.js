@@ -234,7 +234,7 @@ $('#start').onclick = async () => {
   window.EJS_onGameStart = () => {
     clearTimeout(startupTimer);
     const manager = window.EJS_emulator?.gameManager;
-    if (!arcade) manager?.functions?.setVariable('pcsx_rearmed_multitap', 'port 1');
+    if (!arcade) manager?.functions?.setVariable('pcsx_rearmed_multitap', player.game.maxPlayers > 2 ? 'port 1' : 'disabled');
     manager?.setVSync(false);
     $('#start').hidden = true;
     if (netplay) {
