@@ -33,8 +33,8 @@ export interface GameDefinition { console: 'ps1' | 'neogeo'; id: string; name: s
 // Arcade titles stay disabled until their exact ROM set and two-player boot
 // have been validated against the pinned emulator core.
 export const metalSlugDefinitions: readonly GameDefinition[] = [
-  { id: 'metal-slug', name: 'Metal Slug', console: 'neogeo', maxPlayers: 2, enabled: false, adapter: 'emulatorjs-neogeo' },
-  { id: 'metal-slug-2', name: 'Metal Slug 2', console: 'neogeo', maxPlayers: 2, enabled: false, adapter: 'emulatorjs-neogeo' },
+  { id: 'metal-slug', name: 'Metal Slug', console: 'neogeo', maxPlayers: 2, enabled: true, adapter: 'emulatorjs-neogeo' },
+  { id: 'metal-slug-2', name: 'Metal Slug 2', console: 'neogeo', maxPlayers: 2, enabled: true, adapter: 'emulatorjs-neogeo' },
   { id: 'metal-slug-x', name: 'Metal Slug X', console: 'neogeo', maxPlayers: 2, enabled: false, adapter: 'emulatorjs-neogeo' },
   { id: 'metal-slug-3', name: 'Metal Slug 3', console: 'neogeo', maxPlayers: 2, enabled: false, adapter: 'emulatorjs-neogeo' },
   { id: 'metal-slug-4', name: 'Metal Slug 4', console: 'neogeo', maxPlayers: 2, enabled: false, adapter: 'emulatorjs-neogeo' },

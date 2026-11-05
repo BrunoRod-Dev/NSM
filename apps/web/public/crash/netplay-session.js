@@ -5,7 +5,7 @@ const digest = async data => [...new Uint8Array(await crypto.subtle.digest('SHA-
   .map(value => value.toString(16).padStart(2, '0')).join('');
 const validMask = value => Number.isInteger(value) && value >= 0 && value <= 65535;
 
-export function createNetplay({ host, readMask, status }) {
+export function createNetplay({ host, readMask, status, memory = gameMemory }) {
   const peers = new Map();
   let manager, version, booted = false, stopped = false, syncing = false;
   let epoch = 0, batch = 0, restart = true, guestReady = false, incoming;
@@ -36,7 +36,7 @@ export function createNetplay({ host, readMask, status }) {
     const completedEpoch = epoch;
     if (batch % 120 === 0) {
       checking = true;
-      try { localChecksum = await digest(gameMemory(manager.getState())); }
+      try { localChecksum = await digest(memory(manager.getState())); }
       finally { checking = false; }
     } else localChecksum = undefined;
     if (stopped || epoch !== completedEpoch) return;

@@ -1,3 +1,4 @@
+import { arcadeMemory } from './arcade-state.js';
 import { createNetplay } from './netplay-session.js';
 import { installFrameGate } from './frame-gate.js';
 import { setupMobilePlayer } from './mobile-player.js';
@@ -203,7 +204,7 @@ $('#start').onclick = async () => {
     const owner = player.players.find(member => member.seat === player.seat).user.id;
     files = await localFiles(owner, data);
     player.hasSbi = !!files['game.sbi'];
-    installedVersion = 'nsm-psx-v2-4.2.3-legacy:' + data.assets.map(asset => asset.name + ':' + asset.sha256).join('|');
+    installedVersion = 'nsm-frame-v2-4.2.3-legacy:' + player.game.adapter + ':' + data.assets.map(asset => asset.name + ':' + asset.sha256).join('|');
   } catch (error) {
     started = false; $('#start').disabled = false;
     bootMessage(error.message + ' Cerrá esta sala y abrí el catálogo para descargar o reanudar.');
@@ -238,7 +239,7 @@ $('#start').onclick = async () => {
     manager?.setVSync(false);
     $('#start').hidden = true;
     if (netplay) {
-      manager.functions.setVariable('pcsx_rearmed_drc', 'disabled');
+      if (!arcade) manager.functions.setVariable('pcsx_rearmed_drc', 'disabled');
       netplay.start(window.EJS_emulator, installedVersion + ':' + netplay.gate.coreHash);
       $('#save-export').hidden = player.seat !== 0;
       $('#start').hidden = true;
@@ -372,8 +373,8 @@ try {
   document.title = player.game.name + ' · NSM';
   if (player.game.adapter === 'emulatorjs-neogeo') window.dispatchEvent(new Event('nsm:arcade-controls'));
   $('#seat').textContent = `Jugador ${player.seat + 1}`;
-  if (player.game.adapter === 'emulatorjs-psx') {
-    netplay = createNetplay({ host: player.seat === 0, readMask: () => mask, status: bootMessage });
+  if (['emulatorjs-psx', 'emulatorjs-neogeo'].includes(player.game.adapter)) {
+    netplay = createNetplay({ host: player.seat === 0, readMask: () => mask, status: bootMessage, ...(player.game.adapter === 'emulatorjs-neogeo' ? { memory: arcadeMemory } : {}) });
     quality.closest('fieldset').hidden = true;
     $('#start').hidden = false;
   }

@@ -25,9 +25,9 @@ export class GameCatalog {
         const gamePath = resolve(folder, name + '.zip');
         const biosPath = resolve(folder, 'neogeo.zip');
         // A ZIP's existence alone is insufficient. The audit report binds the
-        // exact archives to a successful runtime verification of this core.
+        // exact archives to ROM-set verification. Runtime approval is separate.
         const audit = JSON.parse(await readFile(resolve(folder, name + '.audit.json'), 'utf8'));
-        if (audit.core !== 'emulatorjs-4.2.3-fbneo' || audit.twoPlayerVerified !== true) return null;
+        if (audit.core !== 'emulatorjs-4.2.3-fbneo' || audit.romsetVerified !== true) return null;
         const { createHash } = await import('node:crypto');
         for (const path of [gamePath, biosPath]) {
           const bytes = await readFile(path);

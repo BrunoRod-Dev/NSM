@@ -68,7 +68,7 @@ export class GamesService {
       if (accept) {
         const invitation = this.state().incoming.find(invitation => invitation.id === id);
         if (!invitation) throw new Error('La invitación ya no está disponible.');
-        if (invitation.game.adapter === 'emulatorjs-psx') await this.requireInstalled(invitation.gameId);
+        if (['emulatorjs-psx', 'emulatorjs-neogeo'].includes(invitation.game.adapter)) await this.requireInstalled(invitation.gameId);
       }
       const result = await this.api.request<{ room: GameRoom | null }>(`/games/invitations/${id}`, 'POST', { accept }); await this.refresh(); if (result.room) this.open(result.room); }
     catch (error) { this.error.set(error instanceof Error ? error.message : 'No se pudo responder.'); }
