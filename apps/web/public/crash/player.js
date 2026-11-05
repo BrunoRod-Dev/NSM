@@ -1,3 +1,4 @@
+import { connectLocalRace } from './local-race.js';
 import { setupMobilePlayer } from './mobile-player.js';
 import { manifest, localFiles } from './library.js';
 import { configureGame } from './game-adapters.js';
@@ -17,6 +18,12 @@ const roomId = location.pathname.split('/')[4];
 const base = `/api/games/rooms/${roomId}`;
 const clientId = crypto.randomUUID();
 const peers = new Map();
+let localRace = false, localBooted = false, localVersion, localChannel, closeRace;
+function attachRace(channel) {
+  closeRace?.();
+  localChannel = channel;
+  closeRace = connectLocalRace(channel, player.seat === 0, () => mask, bootMessage, localVersion);
+}
 let bootStatus = 'Sin iniciar';
 const message = text => { $('#status').textContent = text; };
 const bootMessage = text => { bootStatus = text; message(text); };
@@ -54,7 +61,7 @@ function fail(error) {
 }
 async function peer(seat, offer = false) {
   drop(seat);
-  if (stopped || (player.seat === 0 && !stream)) return;
+  if (stopped || (player.seat === 0 && !stream && !localRace)) return;
   const pc = new RTCPeerConnection({ iceServers: player.iceServers });
   const entry = { pc, pending: [], channel: null, statsPrevious: undefined };
   peers.set(seat, entry);
@@ -66,6 +73,16 @@ async function peer(seat, offer = false) {
     if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) entry.input?.release();
   };
   if (player.seat === 0) {
+    if (localRace) {
+      if (seat !== 1) {
+        const full = pc.createDataChannel('ctr-local-full');
+        full.onopen = () => full.send('full');
+      } else {
+      const channel = pc.createDataChannel('ctr-local-v1');
+      entry.channel = channel;
+      channel.onopen = () => attachRace(channel);
+      }
+    } else {
     entry.input = new InputState((index, value) => window.EJS_emulator?.gameManager?.simulateInput(seat, index, value));
     for (const track of stream.getTracks()) {
       if (track.kind === 'video') track.contentHint = 'motion';
@@ -86,10 +103,24 @@ async function peer(seat, offer = false) {
       } catch { /* Ignore malformed or obsolete input packets. */ }
     };
     entry.watchdog = setInterval(() => entry.input.expire(performance.now()), 250);
+    }
   } else {
     const media = new MediaStream();
     pc.ondatachannel = event => {
       entry.channel = event.channel;
+      if (event.channel.label === 'ctr-local-full') {
+        event.channel.onmessage = () => message('Esta prueba de CTR admite dos jugadores. Elegí otra sala.');
+        return;
+      }
+      if (event.channel.label === 'ctr-local-v1' && player.gameId === 'crash-team-racing' && player.seat === 1) {
+        localRace = true;
+        localChannel = event.channel;
+        $('#start').hidden = false;
+        $('#start').textContent = 'Iniciar mi copia de CTR';
+        bootMessage('Sala local de prueba. Iniciá tu copia instalada de CTR.');
+        if (localBooted) attachRace(localChannel);
+        return;
+      }
       entry.channel.onopen = sendProfile;
       if (entry.channel.readyState === 'open') sendProfile();
       entry.channel.onmessage = event => {
@@ -173,13 +204,21 @@ $('#start').onclick = async () => {
   let files;
   try {
     bootMessage('Verificando la instalación local…');
-    files = await localFiles(player.host.id, await manifest(player.gameId));
+    const data = await manifest(player.gameId);
+    const owner = player.players.find(member => member.seat === player.seat).user.id;
+    files = await localFiles(owner, data);
+    localVersion = data.assets.map(asset => asset.sha256).join('.');
+    if (localRace) player.hasSbi = !!files['game.sbi'];
   } catch (error) {
     started = false; $('#start').disabled = false;
     bootMessage(error.message + ' Cerrá esta sala y abrí el catálogo para descargar o reanudar.');
     return;
   }
   configureGame({ base, player, files });
+  if (localRace) {
+    window.EJS_forceLegacyCores = true;
+    window.EJS_gameName += ' - Carrera local J' + (player.seat + 1);
+  }
   const arcade = player.game.adapter === 'emulatorjs-neogeo';
   let stage = 'Preparación del emulador';
   const retryEngine = () => {
@@ -206,6 +245,15 @@ $('#start').onclick = async () => {
     if (!arcade) manager?.functions?.setVariable('pcsx_rearmed_multitap', 'port 1');
     manager?.setVSync(false);
     $('#start').hidden = true;
+    if (localRace) {
+      localBooted = true;
+      manager.toggleMainLoop(0);
+      bootMessage('CTR preparado. Esperando al otro jugador…');
+      if (player.seat === 0) {
+        api('ready').then(() => { sharing = true; void poll(); }).catch(fail);
+      } else if (localChannel?.readyState === 'open') attachRace(localChannel);
+      return;
+    }
     $('#save-export').hidden = false;
     $('#save-import').hidden = false;
     $('#game').focus();
@@ -219,7 +267,7 @@ $('#start').onclick = async () => {
     };
     void connect();
   };
-  $('#game').replaceChildren(); const script = document.createElement('script'); script.src = `${base}/media/loader.js`;
+  $('#game').replaceChildren(); const script = document.createElement('script'); script.src = localRace ? '/api/games/library/crash-team-racing/media/loader.js' : `${base}/media/loader.js`;
   script.onerror = () => { clearTimeout(startupTimer); retryEngine(); bootMessage('No se pudo cargar el emulador. Podés reintentar en esta sala.'); };
   document.body.append(script); bootMessage('Preparando el emulador de ' + player.game.name + '…');
 };
@@ -233,6 +281,7 @@ $('#reconnect').onclick = async () => {
   finally { if (!stopped && !pendingPoll) { clearTimeout(pollTimer); void poll(); } $('#reconnect').disabled = false; }
 };
 function transmit() {
+  if (localRace) return;
   const channel = peers.get(0)?.channel;
   if (player?.seat > 0 && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'input', mask, sequence: sequence++ }));
 }
@@ -242,7 +291,7 @@ let mobile;
 try { mobile = setupMobilePlayer(next => controls.setTouchMask(next)); }
 catch (error) { console.error('No se pudo preparar la interfaz móvil:', error); }
 const inputTimer = setInterval(transmit, 50);
-const pingTimer = setInterval(() => { const channel = peers.get(0)?.channel; if (!stopped && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'ping', at: performance.now(), profile: quality.value, fps: peers.get(0)?.localFps })); }, 2000);
+const pingTimer = setInterval(() => { const channel = peers.get(0)?.channel; if (!localRace && !stopped && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'ping', at: performance.now(), profile: quality.value, fps: peers.get(0)?.localFps })); }, 2000);
 const heartbeat = setInterval(() => { if (player && !stopped) void api('heartbeat').catch(fail); }, 10000);
 let statsBusy = false;
 const statsTimer = setInterval(async () => {
@@ -329,6 +378,19 @@ try {
   $('#seat').textContent = `Jugador ${player.seat + 1}`;
   $('#instructions').textContent = player.seat === 0 ? 'Este dispositivo descarga y ejecuta el juego. Mantené esta pestaña abierta. El progreso queda en este navegador.' : 'El anfitrión ejecuta el juego. En celular, usá el joystick táctil. Con teclado: WASD para mover y Enter para Start.';
   if (player.seat === 0) {
+    if (player.gameId === 'crash-team-racing' && player.players.every(member => member.seat <= 1)) {
+      const localButton = document.createElement('button');
+      localButton.className = 'menu-command';
+      localButton.textContent = 'Carrera local · 2 jugadores (prueba)';
+      $('#start').after(localButton);
+      localButton.onclick = () => {
+        if (started || stopped) return;
+        localRace = true;
+        localButton.hidden = true;
+        $('#start').click();
+      };
+      $('#start').addEventListener('click', () => { localButton.hidden = true; });
+    }
     await api('host-reset');
     $('#start').hidden = false;
     message('Pulsá Jugar para cargar el juego en este dispositivo.');
