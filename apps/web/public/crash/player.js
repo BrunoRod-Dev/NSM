@@ -1,3 +1,5 @@
+import { createNetplay } from './netplay-session.js';
+import { installFrameGate } from './frame-gate.js';
 import { setupMobilePlayer } from './mobile-player.js';
 import { manifest, localFiles } from './library.js';
 import { configureGame } from './game-adapters.js';
@@ -17,13 +19,14 @@ const roomId = location.pathname.split('/')[4];
 const base = `/api/games/rooms/${roomId}`;
 const clientId = crypto.randomUUID();
 const peers = new Map();
+let netplay, installedVersion;
 let bootStatus = 'Sin iniciar';
 const message = text => { $('#status').textContent = text; };
 const bootMessage = text => { bootStatus = text; message(text); };
 const quality = $('#stream-quality');
 quality.value = isAppleMobile() || matchMedia('(pointer: coarse)').matches ? 'smooth' : 'balanced';
 try { const saved = localStorage.getItem('nsm.stream.profile'); if (validProfile(saved)) quality.value = saved; } catch {}
-const sendProfile = () => { const channel = peers.get(0)?.channel; if (channel?.readyState === 'open') channel.send(JSON.stringify({ type: 'quality', profile: quality.value })); };
+const sendProfile = () => { if (netplay) return; const channel = peers.get(0)?.channel; if (channel?.readyState === 'open') channel.send(JSON.stringify({ type: 'quality', profile: quality.value })); };
 quality.onchange = () => {
   try { localStorage.setItem('nsm.stream.profile', quality.value); } catch {}
   if (player?.seat === 0) for (const entry of peers.values()) void setVideoProfile(entry, quality.value, window.EJS_emulator?.canvas);
@@ -43,7 +46,7 @@ function drop(seat) {
   clearInterval(peer.watchdog); peer.input?.release(); peer.pc.close(); peers.delete(seat);
 }
 function stop() {
-  stopped = true; clearTimeout(pollTimer);
+  stopped = true; netplay?.dispose(); clearTimeout(pollTimer);
   for (const seat of [...peers.keys()]) drop(seat);
   captureDispose?.(); tabCapture?.getTracks().forEach(track => track.stop()); stream?.getTracks().forEach(track => track.stop());
   stream = null; sharing = false;
@@ -54,7 +57,7 @@ function fail(error) {
 }
 async function peer(seat, offer = false) {
   drop(seat);
-  if (stopped || (player.seat === 0 && !stream)) return;
+  if (stopped || (player.seat === 0 && !stream && !netplay)) return;
   const pc = new RTCPeerConnection({ iceServers: player.iceServers });
   const entry = { pc, pending: [], channel: null, statsPrevious: undefined };
   peers.set(seat, entry);
@@ -66,6 +69,10 @@ async function peer(seat, offer = false) {
     if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) entry.input?.release();
   };
   if (player.seat === 0) {
+    if (netplay) {
+      entry.channel = pc.createDataChannel('nsm-psx-controls-v2');
+      netplay.attach(seat, entry.channel);
+    } else {
     entry.input = new InputState((index, value) => window.EJS_emulator?.gameManager?.simulateInput(seat, index, value));
     for (const track of stream.getTracks()) {
       if (track.kind === 'video') track.contentHint = 'motion';
@@ -86,10 +93,20 @@ async function peer(seat, offer = false) {
       } catch { /* Ignore malformed or obsolete input packets. */ }
     };
     entry.watchdog = setInterval(() => entry.input.expire(performance.now()), 250);
+    }
   } else {
     const media = new MediaStream();
     pc.ondatachannel = event => {
       entry.channel = event.channel;
+      if (netplay) {
+        if (event.channel.label !== 'nsm-psx-controls-v2') {
+          message('La sala usa otra versión de NSM. Recargá ambos dispositivos.');
+          event.channel.close();
+          return;
+        }
+        netplay.attach(0, event.channel);
+        return;
+      }
       entry.channel.onopen = sendProfile;
       if (entry.channel.readyState === 'open') sendProfile();
       entry.channel.onmessage = event => {
@@ -109,7 +126,7 @@ async function peer(seat, offer = false) {
 }
 async function receive(event) {
   if (event.type === 'joined' && player.seat === 0) { await peer(event.seat, true); return; }
-  if (event.type === 'left') { drop(event.seat); return; }
+  if (event.type === 'left') { drop(event.seat); netplay?.remove(event.seat); return; }
   let entry = peers.get(event.from);
   if (event.type === 'offer') {
     entry ??= await peer(event.from);
@@ -144,7 +161,7 @@ async function pollOnce() {
   try {
     const data = await api('poll', { ack });
     if (stopped) return;
-    if (player.seat > 0 && !data.ready) message(`${player.host.displayName} está preparando el juego. Entrás sin descargar el disco.`);
+    if (!netplay && player.seat > 0 && !data.ready) message(`${player.host.displayName} está preparando el juego. Entrás sin descargar el disco.`);
     for (const event of data.events) { if (stopped) return; await receive(event); ack = event.eventId; }
   } catch (error) { fail(error); }
   if (!stopped) pollTimer = setTimeout(poll, signalWaiting ? 0 : 5000);
@@ -166,6 +183,15 @@ async function share(useTabAudio = false) {
   } catch (error) { captureDispose?.(); tabCapture?.getTracks().forEach(track => track.stop()); stream?.getTracks().forEach(track => track.stop()); stream = null; message(error.message); }
   finally { $('#share').disabled = false; }
 }
+async function awaitNetplay() {
+  try {
+    await api('ready');
+    sharing = true;
+    ack = 0;
+    clearTimeout(pollTimer);
+    void poll();
+  } catch (error) { fail(error); }
+}
 let startupTimer;
 $('#start').onclick = async () => {
   if (started || stopped) return;
@@ -173,7 +199,11 @@ $('#start').onclick = async () => {
   let files;
   try {
     bootMessage('Verificando la instalación local…');
-    files = await localFiles(player.host.id, await manifest(player.gameId));
+    const data = await manifest(player.gameId);
+    const owner = player.players.find(member => member.seat === player.seat).user.id;
+    files = await localFiles(owner, data);
+    player.hasSbi = !!files['game.sbi'];
+    installedVersion = 'nsm-psx-v2-4.2.3-legacy:' + data.assets.map(asset => asset.name + ':' + asset.sha256).join('|');
   } catch (error) {
     started = false; $('#start').disabled = false;
     bootMessage(error.message + ' Cerrá esta sala y abrí el catálogo para descargar o reanudar.');
@@ -198,6 +228,7 @@ $('#start').onclick = async () => {
   window.EJS_ready = () => {
     stage = 'Inicio de ' + player.game.name;
     bootMessage('Iniciando ' + player.game.name + '…');
+    if (netplay) installFrameGate(window.EJS_emulator, netplay.gate);
     ready();
   };
   window.EJS_onGameStart = () => {
@@ -206,6 +237,18 @@ $('#start').onclick = async () => {
     if (!arcade) manager?.functions?.setVariable('pcsx_rearmed_multitap', 'port 1');
     manager?.setVSync(false);
     $('#start').hidden = true;
+    if (netplay) {
+      manager.functions.setVariable('pcsx_rearmed_drc', 'disabled');
+      netplay.start(window.EJS_emulator, installedVersion + ':' + netplay.gate.coreHash);
+      $('#save-export').hidden = player.seat !== 0;
+      $('#start').hidden = true;
+      $('#reconnect').hidden = player.seat === 0;
+      if (player.seat === 0) {
+        awaitNetplay();
+      }
+      $('#game').focus();
+      return;
+    }
     $('#save-export').hidden = false;
     $('#save-import').hidden = false;
     $('#game').focus();
@@ -219,7 +262,7 @@ $('#start').onclick = async () => {
     };
     void connect();
   };
-  $('#game').replaceChildren(); const script = document.createElement('script'); script.src = `${base}/media/loader.js`;
+  $('#game').replaceChildren(); const script = document.createElement('script'); script.src = netplay ? '/api/games/library/' + encodeURIComponent(player.gameId) + '/media/loader.js' : `${base}/media/loader.js`;
   script.onerror = () => { clearTimeout(startupTimer); retryEngine(); bootMessage('No se pudo cargar el emulador. Podés reintentar en esta sala.'); };
   document.body.append(script); bootMessage('Preparando el emulador de ' + player.game.name + '…');
 };
@@ -233,22 +276,24 @@ $('#reconnect').onclick = async () => {
   finally { if (!stopped && !pendingPoll) { clearTimeout(pollTimer); void poll(); } $('#reconnect').disabled = false; }
 };
 function transmit() {
+  if (netplay) return;
   const channel = peers.get(0)?.channel;
   if (player?.seat > 0 && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'input', mask, sequence: sequence++ }));
 }
 const localInput = new InputState((index, value) => window.EJS_emulator?.gameManager?.simulateInput(0, index, value));
-const controls = setupControls(next => { mask = next; if (player?.seat === 0) localInput.update(mask); else transmit(); });
+const controls = setupControls(next => { mask = next; if (netplay) return; if (player?.seat === 0) localInput.update(mask); else transmit(); });
 let mobile;
 try { mobile = setupMobilePlayer(next => controls.setTouchMask(next)); }
 catch (error) { console.error('No se pudo preparar la interfaz móvil:', error); }
 const inputTimer = setInterval(transmit, 50);
-const pingTimer = setInterval(() => { const channel = peers.get(0)?.channel; if (!stopped && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'ping', at: performance.now(), profile: quality.value, fps: peers.get(0)?.localFps })); }, 2000);
+const pingTimer = setInterval(() => { const channel = peers.get(0)?.channel; if (!netplay && !stopped && channel?.readyState === 'open' && channel.bufferedAmount < 4096) channel.send(JSON.stringify({ type: 'ping', at: performance.now(), profile: quality.value, fps: peers.get(0)?.localFps })); }, 2000);
 const heartbeat = setInterval(() => { if (player && !stopped) void api('heartbeat').catch(fail); }, 10000);
 let statsBusy = false;
 const statsTimer = setInterval(async () => {
   if (statsBusy || stopped) return;
   statsBusy = true;
   try {
+    if (netplay) { $('#metrics').textContent = netplay.summary(); return; }
     const lines = [];
     const host = player?.seat === 0;
     const format = value => Number.isFinite(value) ? Math.round(value) + ' FPS' : 'Sin datos';
@@ -327,7 +372,13 @@ try {
   document.title = player.game.name + ' · NSM';
   if (player.game.adapter === 'emulatorjs-neogeo') window.dispatchEvent(new Event('nsm:arcade-controls'));
   $('#seat').textContent = `Jugador ${player.seat + 1}`;
+  if (player.game.adapter === 'emulatorjs-psx') {
+    netplay = createNetplay({ host: player.seat === 0, readMask: () => mask, status: bootMessage });
+    quality.closest('fieldset').hidden = true;
+    $('#start').hidden = false;
+  }
   $('#instructions').textContent = player.seat === 0 ? 'Este dispositivo descarga y ejecuta el juego. Mantené esta pestaña abierta. El progreso queda en este navegador.' : 'El anfitrión ejecuta el juego. En celular, usá el joystick táctil. Con teclado: WASD para mover y Enter para Start.';
+  if (netplay) $('#instructions').textContent = 'Cada jugador ejecuta su copia instalada. Los controles corresponden a tu número en la sala. Mantené el juego visible para continuar juntos.';
   if (player.seat === 0) {
     await api('host-reset');
     $('#start').hidden = false;
@@ -339,5 +390,5 @@ try {
       }).catch(() => {});
     }
   }
-  else { $('#reconnect').hidden = false; await api('resume'); message('Esperando imagen del anfitrión…'); void poll(); }
+  else { $('#reconnect').hidden = false; await api('resume'); message(netplay ? 'Pulsá Jugar para preparar tu copia y unirte a la partida.' : 'Esperando imagen del anfitrión…'); void poll(); }
 } catch (error) { message(error.message); stop(); }
