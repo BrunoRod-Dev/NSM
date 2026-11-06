@@ -10,6 +10,9 @@ export function createNetplay({ host, readMask, status, memory = gameMemory }) {
   let manager, version, booted = false, stopped = false, syncing = false;
   let epoch = 0, batch = 0, restart = true, guestReady = false, incoming;
   let localChecksum, checking = false, membership = 0;
+  let resyncs = 0, completedFrames = 0, measuredFps = 0;
+  let sampleAt = performance.now(), sampledFrames = 0;
+  let waitSince = 0, lastWait = 0;
   const send = (peer, value) => {
     if (peer.channel.readyState !== 'open') throw Error('Se perdió la conexión con un jugador.');
     peer.channel.send(JSON.stringify(value));
@@ -32,6 +35,12 @@ export function createNetplay({ host, readMask, status, memory = gameMemory }) {
       status(host ? 'Juego preparado. Esperando jugadores…' : 'Juego preparado. Conectando con el anfitrión…');
       return;
     }
+    completedFrames += 4;
+    const now = performance.now();
+    if (now - sampleAt >= 1000) {
+      measuredFps = Math.round((completedFrames - sampledFrames) * 1000 / (now - sampleAt));
+      sampledFrames = completedFrames; sampleAt = now;
+    }
     batch++;
     const completedEpoch = epoch;
     if (batch % 120 === 0) {
@@ -51,8 +60,12 @@ export function createNetplay({ host, readMask, status, memory = gameMemory }) {
     if (restart) { void synchronize().catch(error => fail(error.message)); return; }
     const masks = [readMask(), 0, 0, 0];
     for (const [seat, peer] of peers) {
-      if (!peer.hello || peer.channel.readyState !== 'open' || peer.done !== batch) return;
+      if (!peer.hello || peer.channel.readyState !== 'open' || peer.done !== batch) {
+        if (!waitSince) waitSince = performance.now();
+        return;
+      }
       if (localChecksum && peer.checksum !== localChecksum) {
+        resyncs++;
         restart = true;
         status('Ajustando la sincronización de los jugadores…');
         void synchronize().catch(error => fail(error.message));
@@ -60,6 +73,7 @@ export function createNetplay({ host, readMask, status, memory = gameMemory }) {
       }
       masks[seat] = peer.mask;
     }
+    if (waitSince) { lastWait = Math.round(performance.now() - waitSince); waitSince = 0; }
     for (const peer of peers.values()) send(peer, { type: 'run', epoch, batch, masks });
     gate.run(masks);
   }
@@ -205,6 +219,6 @@ export function createNetplay({ host, readMask, status, memory = gameMemory }) {
     },
     remove(seat) { membership++; peers.delete(seat); restart = true; if (host) advance(); },
     dispose() { stopped = true; gate.stop(); clearInterval(timer); },
-    summary() { return 'Cuadros compartidos: ' + gate.frame + ' · Ronda de sincronización: ' + epoch + (stopped ? ' · Detenida' : ''); },
+    summary() { const fps = performance.now() - sampleAt > 2000 ? 0 : measuredFps; return 'Avance: ' + fps + ' cuadros/s · Cuadros compartidos: ' + gate.frame + ' · Ronda: ' + epoch + ' · Resincronizaciones por diferencia: ' + resyncs + (host ? ' · Espera del otro equipo: ' + (waitSince ? Math.round(performance.now() - waitSince) : lastWait) + ' ms' : '') + (stopped ? ' · Detenida' : ''); },
   };
 }

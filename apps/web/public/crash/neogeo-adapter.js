@@ -40,6 +40,17 @@ export function configureNeoGeo({ player, files }) {
         return write.call(this, path, data instanceof ArrayBuffer ? new Uint8Array(data) : data);
       };
     }
+    if (prototype?.getRetroArchCfg) {
+      const original = prototype.getRetroArchCfg;
+      prototype.getRetroArchCfg = function () {
+        let config = original.call(this);
+        for (const [key, value] of Object.entries({ pause_nonactive: 'false', pause_on_disconnect: 'false', video_vsync: 'false' })) {
+          const pattern = new RegExp('^' + key + '\\s*=.*$', 'gm');
+          config = pattern.test(config) ? config.replace(pattern, key + ' = ' + value) : config + '\n' + key + ' = ' + value + '\n';
+        }
+        return config;
+      };
+    }
     document.querySelector('#game .ejs_start_button')?.click();
   };
 }
