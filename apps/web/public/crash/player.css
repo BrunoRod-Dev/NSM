@@ -31,3 +31,12 @@ dialog fieldset{border:2px groove #eee;margin:10px 0;padding:8px 10px}dialog leg
 
 /* Let the mobile video compositor scale decoded frames normally. */
 #remote-video{image-rendering:auto}
+
+/* A dedicated bottom strip keeps system buttons outside the game image. */
+.touch-dpad{display:block;border:2px solid #a5d4d566;border-radius:50%;background:radial-gradient(circle,#263d49dd,#101a20dd);box-shadow:inset 0 0 14px #0008}
+.touch-dpad .stick-ring{position:absolute;inset:17%;border:1px solid #adc9cd55;border-radius:50%;background:transparent;pointer-events:none}
+.touch-dpad .stick-knob{position:absolute;left:50%;top:50%;width:42%;height:42%;border:2px solid #bcd5db99;border-radius:50%;background:linear-gradient(#75959e,#354b58);box-shadow:0 4px 8px #0009;transform:translate(-50%,-50%);pointer-events:none}
+.touch-dpad.held .stick-knob{border-color:#a5ffe7;background:linear-gradient(#7cadb0,#376b69)}
+.touch-enabled #play-area{background:#101a20}
+.touch-system{z-index:3}
+@media (orientation:landscape){.touch-enabled #game{height:calc(100% - 48px - env(safe-area-inset-bottom))}#touch-controls .touch-dpad,#touch-controls .touch-face{bottom:calc(56px + env(safe-area-inset-bottom))}#touch-controls .touch-shoulders{bottom:calc(66px + env(safe-area-inset-bottom) + var(--pad-size))}}
