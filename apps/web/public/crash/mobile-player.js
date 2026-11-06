@@ -15,6 +15,7 @@ export function setupMobilePlayer(write) {
     <div class="touch-shoulders touch-right"><button data-input="11">R1</button><button data-input="13">R2</button></div>
     <div class="touch-face"><button class="triangle" data-input="9" aria-label="Triángulo">△</button><button class="square" data-input="1" aria-label="Cuadrado">□</button><button class="circle" data-input="8" aria-label="Círculo">○</button><button class="cross" data-input="0" aria-label="Cruz">×</button></div>`;
   window.addEventListener('nsm:arcade-controls', () => {
+    root.classList.add('arcade-touch');
     root.querySelectorAll('.touch-shoulders').forEach(node => node.hidden = true);
     for (const [input, label] of [[0, 'Disparo'], [8, 'Salto'], [1, 'Granada'], [9, 'Acción'], [2, 'Ficha']]) {
       const button = root.querySelector('button[data-input="' + input + '"]');

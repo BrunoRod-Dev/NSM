@@ -49,3 +49,8 @@ dialog fieldset{border:2px groove #eee;margin:10px 0;padding:8px 10px}dialog leg
   .touch-system{bottom:auto;top:max(6px,env(safe-area-inset-top));gap:8px}
   .touch-system button{min-width:48px;font-size:9px!important;min-height:26px!important;opacity:.7}
 }
+
+/* Long arcade labels must not enlarge grid tracks beyond the screen. */
+#touch-controls .touch-face{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));max-width:calc(50vw - 20px)}
+#touch-controls .touch-face button{box-sizing:border-box;min-width:0;width:100%;max-width:100%;min-height:0;overflow:hidden;padding:2px;white-space:nowrap}
+#touch-controls.arcade-touch .touch-face button{font-size:clamp(8px,2.5vw,11px)!important;line-height:1.1;letter-spacing:-.2px}
