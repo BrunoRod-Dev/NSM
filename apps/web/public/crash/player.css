@@ -32,11 +32,20 @@ dialog fieldset{border:2px groove #eee;margin:10px 0;padding:8px 10px}dialog leg
 /* Let the mobile video compositor scale decoded frames normally. */
 #remote-video{image-rendering:auto}
 
-/* A dedicated bottom strip keeps system buttons outside the game image. */
+/* Touch joystick surface. */
 .touch-dpad{display:block;border:2px solid #a5d4d566;border-radius:50%;background:radial-gradient(circle,#263d49dd,#101a20dd);box-shadow:inset 0 0 14px #0008}
 .touch-dpad .stick-ring{position:absolute;inset:17%;border:1px solid #adc9cd55;border-radius:50%;background:transparent;pointer-events:none}
 .touch-dpad .stick-knob{position:absolute;left:50%;top:50%;width:42%;height:42%;border:2px solid #bcd5db99;border-radius:50%;background:linear-gradient(#75959e,#354b58);box-shadow:0 4px 8px #0009;transform:translate(-50%,-50%);pointer-events:none}
 .touch-dpad.held .stick-knob{border-color:#a5ffe7;background:linear-gradient(#7cadb0,#376b69)}
 .touch-enabled #play-area{background:#101a20}
 .touch-system{z-index:3}
-@media (orientation:landscape){.touch-enabled #game{height:calc(100% - 48px - env(safe-area-inset-bottom))}#touch-controls .touch-dpad,#touch-controls .touch-face{bottom:calc(56px + env(safe-area-inset-bottom))}#touch-controls .touch-shoulders{bottom:calc(66px + env(safe-area-inset-bottom) + var(--pad-size))}}
+
+.mobile-game-exit{display:none}
+@media (orientation:landscape) and (any-pointer:coarse){
+  body.mobile-expanded>.controls,body.mobile-expanded>#status,html:fullscreen body>.controls,html:fullscreen body>#status{display:none!important}
+  body.mobile-expanded #play-area,html:fullscreen #play-area{height:100%;width:100%;flex:1}
+  body.mobile-expanded #game,html:fullscreen #game{height:100%!important}
+  body.mobile-expanded .mobile-game-exit,html:fullscreen .mobile-game-exit{display:block;position:fixed;right:max(6px,env(safe-area-inset-right));top:max(6px,env(safe-area-inset-top));z-index:10;border:1px solid #ffffff55;border-radius:8px;background:#101a2077;color:#fff;font-size:18px;padding:4px 9px;min-height:30px;touch-action:manipulation}
+  .touch-system{bottom:auto;top:max(6px,env(safe-area-inset-top));gap:8px}
+  .touch-system button{min-width:48px;font-size:9px!important;min-height:26px!important;opacity:.7}
+}

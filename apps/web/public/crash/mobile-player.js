@@ -125,6 +125,11 @@ export function setupMobilePlayer(write) {
   });
   listen(document, 'fullscreenchange', () => { if (!document.fullscreenElement) { screen.orientation?.unlock?.(); setExpanded(false); } else setExpanded(true); });
   listen(window, 'keydown', event => { if (event.key === 'Escape' && expanded && !document.fullscreenElement) setExpanded(false); });
+  const exit = document.createElement('button');
+  exit.className = 'mobile-game-exit'; exit.type = 'button';
+  exit.textContent = '↙'; exit.setAttribute('aria-label', 'Salir de pantalla completa');
+  document.body.append(exit);
+  listen(exit, 'click', () => fullscreen.click());
   apply();
-  return { dispose() { release(); setExpanded(false); abort.abort(); } };
+  return { dispose() { release(); setExpanded(false); exit.remove(); abort.abort(); } };
 }
